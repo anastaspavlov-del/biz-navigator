@@ -125,9 +125,9 @@ with tab2:
                         * 📈 **Маркетингова стратегия:** Откъде да намериш първите си 10 клиенти.
                         """)
                         
-                        stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
-                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", stripe_link, use_container_width=True)
-                        
+                        epay_link = "https://www.epay.bg/v3/v3_pay.vgi?вашият_уникален_код_на_бутона" 
+                        st.link_button("💳 Отключи през ePay.bg / EasyPay за 4.99 EUR", epay_link, use_container_width=True)
+
                         st.caption("🔒 Сигурно плащане. Ще получиш доклада си веднага след трансакцията.")
                         
                     except Exception as e:
