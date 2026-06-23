@@ -1,9 +1,82 @@
+import streamlit as st
+import math
+from openai import OpenAI
+
+# 1. Оптимизация за мобилни устройства
+st.set_page_config(
+    page_title="Бизнес Навигатор", 
+    page_icon="🚀", 
+    layout="centered", 
+    initial_sidebar_state="collapsed"
+)
+
+# Стилизиране за мобилен изглед
+st.markdown("""
+    <style>
+    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; max-width: 450px; }
+    .stMetric { background-color: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e9ecef; }
+    div[data-testid="stNotification"] { border-radius: 12px; }
+    </style>
+""", unsafe_allowed_html=True)
+
+# Инициализация на данните в сесията
+if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
+if "price" not in st.session_state: st.session_state.price = 50
+if "cost" not in st.session_state: st.session_state.cost = 20
+
+# Заглавие на приложението
+st.title("🚀 Бизнес Навигатор")
+st.caption("Твоят дигитален стартъп ментор")
+
+# СЪЗДАВАНЕ НА ТАБОВЕТЕ (Това е липсвало на ред 4)
+tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
+
+# ==========================================
+# ТАБ 1: ФИНАНСОВ СИМУЛАТОР
+# ==========================================
+with tab1:
+    st.markdown("### 📱 Финансов симулатор")
+    st.write("Нагласи слайдерите с пръст, за да видиш минимума за оцеляване:")
+    
+    st.session_state.fixed_costs = st.slider(
+        "💼 Месечни постоянни разходи (наем, осигуровки)", 
+        min_value=200, max_value=10000, value=st.session_state.fixed_costs, step=100
+    )
+    
+    st.session_state.price = st.slider(
+        "💰 Продажна цена за 1 бройка / час", 
+        min_value=5, max_value=500, value=st.session_state.price, step=5
+    )
+    
+    st.session_state.cost = st.slider(
+        "📦 Себестойност на 1 бройка (материали/доставка)", 
+        min_value=0, max_value=300, value=st.session_state.cost, step=5
+    )
+    
+    st.markdown("---")
+    
+    if st.session_state.price <= st.session_state.cost:
+        st.error("🛑 Цената трябва да е по-висока от себестойността!")
+    else:
+        margin = st.session_state.price - st.session_state.cost
+        be_units = math.ceil(st.session_state.fixed_costs / margin)
+        min_turnover = be_units * st.session_state.price
+        
+        st.markdown("#### **Резултат за твоя бизнес:**")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
+        with col2:
+            st.metric(label="Минимум оборот", value=f"{min_turnover} лв.")
+            
+        st.info(f"💡 Това означава средно по **{be_units/30:.1f} продажби на ден**, за да излезеш на нула.")
+
 # ==========================================
 # ТАБ 2: AI ВАЛИДАЦИЯ (МОДЕЛ С ПЛАЩАНЕ ЗА ДОКЛАД)
 # ==========================================
 with tab2:
     st.markdown("### 🤖 Запиши идеята си")
-    st.write("Въведи твоя OpenAI API ключ в полето под настройките, за да активираш учения ментор:")
+    st.write("Въведи твоя OpenAI API ключ в полето, за да активираш учения ментор:")
     
     api_key = st.text_input("Въведи OpenAI API Key:", type="password")
     
@@ -37,7 +110,6 @@ with tab2:
                         margin = st.session_state.price - st.session_state.cost
                         be_units = math.ceil(st.session_state.fixed_costs / margin) if margin > 0 else 0
                         
-                        # Промпт САМО за безплатната (кратка) част
                         free_prompt = f"""
                         Ти си бизнес консултант. Направи КРАТЪК предварителен преглед (до 3 изречения) на тази бизнес идея: '{final_concept}'.
                         Финанси: Месечен разход {st.session_state.fixed_costs} лв. Нужни продажби: {be_units} бр.
@@ -50,12 +122,10 @@ with tab2:
                             temperature=0.7
                         )
                         
-                        # Извеждане на безплатния анализ
                         st.markdown("---")
                         st.markdown("### 🔓 Твоят безплатен предварителен анализ:")
                         st.info(response.choices[0].message.content)
                         
-                        # --- СЕКЦИЯ ЗА МОНЕТИЗАЦИЯ (ПЛАТЕНАТА КУКИЧКА) ---
                         st.markdown("### 📊 Отключи Пълния Експертен Доклад")
                         st.write("Нашият AI е подготвил подробен дигитален бизнес план специално за твоята ниша, който съдържа:")
                         st.markdown("""
@@ -65,8 +135,7 @@ with tab2:
                         * 📈 **Маркетингова стратегия:** Откъде да намериш първите си 10 клиенти.
                         """)
                         
-                        # Голям мобилен бутон за плащане
-                        # ЗАМЕНЕТЕ долния линк с вашия реален линк за плащане от Stripe или ePay
+                        # ВАЖНО: Заменете този линк с вашия реален Stripe линк, когато го създадете
                         stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
                         st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 лв.", stripe_link, use_container_width=True)
                         
