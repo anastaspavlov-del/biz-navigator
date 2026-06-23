@@ -62,7 +62,7 @@ with tab1:
         with col1:
             st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
         with col2:
-            st.metric(label="Минимум оборот", value=f"{min_turnover} лв.")
+            st.metric(label="Минимум оборот", value=f"{min_turnover} евро")
             
         st.info(f"💡 Това означава средно по **{be_units/30:.1f} продажби на ден**, за да излезеш на нула.")
 
@@ -102,7 +102,7 @@ with tab2:
                         
                         free_prompt = f"""
                         Ти си бизнес консултант. Направи КРАТЪК предварителен преглед (до 3 изречения) на тази бизнес идея: '{final_concept}'.
-                        Финанси: Месечен разход {st.session_state.fixed_costs} лв. Нужни продажби: {be_units} бр.
+                        Финанси: Месечен разход {st.session_state.fixed_costs} евро Нужни продажби: {be_units} бр.
                         Дай само бърза оценка дали финансовата цел изглежда лесна или трудна за българския пазар. Бъди позитивен, но реалист.
                         """
                         
@@ -126,7 +126,7 @@ with tab2:
                         """)
                         
                         stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
-                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 лв.", stripe_link, use_container_width=True)
+                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", stripe_link, use_container_width=True)
                         
                         st.caption("🔒 Сигурно плащане. Ще получиш доклада си веднага след трансакцията.")
                         
