@@ -10,15 +10,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Стилизиране за мобилен изглед
-st.markdown("""
-    <style>
-    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; max-width: 450px; }
-    .stMetric { background-color: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e9ecef; }
-    div[data-testid="stNotification"] { border-radius: 12px; }
-    </style>
-""", unsafe_allowed_html=True)
-
 # Инициализация на данните в сесията
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
 if "price" not in st.session_state: st.session_state.price = 50
@@ -28,14 +19,14 @@ if "cost" not in st.session_state: st.session_state.cost = 20
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# СЪЗДАВАНЕ НА ТАБОВЕТЕ (Това е липсвало на ред 4)
+# Създаване на табовете
 tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
 
 # ==========================================
 # ТАБ 1: ФИНАНСОВ СИМУЛАТОР
 # ==========================================
 with tab1:
-    st.markdown("### 📱 Финансов симулатор")
+    st.subheader("📱 Финансов симулатор")
     st.write("Нагласи слайдерите с пръст, за да видиш минимума за оцеляване:")
     
     st.session_state.fixed_costs = st.slider(
@@ -75,7 +66,7 @@ with tab1:
 # ТАБ 2: AI ВАЛИДАЦИЯ (МОДЕЛ С ПЛАЩАНЕ ЗА ДОКЛАД)
 # ==========================================
 with tab2:
-    st.markdown("### 🤖 Запиши идеята си")
+    st.subheader("🤖 Запиши идеята си")
     st.write("Въведи твоя OpenAI API ключ в полето, за да активираш учения ментор:")
     
     api_key = st.text_input("Въведи OpenAI API Key:", type="password")
@@ -135,7 +126,6 @@ with tab2:
                         * 📈 **Маркетингова стратегия:** Откъде да намериш първите си 10 клиенти.
                         """)
                         
-                        # ВАЖНО: Заменете този линк с вашия реален Stripe линк, когато го създадете
                         stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
                         st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 лв.", stripe_link, use_container_width=True)
                         
