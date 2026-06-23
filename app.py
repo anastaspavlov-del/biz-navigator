@@ -125,7 +125,7 @@ with tab2:
                         * 📈 **Маркетингова стратегия:** Откъде да намериш първите си 10 клиенти.
                         """)
                         
-                        estripe_link = "https://buy.stripe.com/your_custom_payment_link" 
+                        stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
                         st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", stripe_link, use_container_width=True)
                         
                         st.caption("🔒 Сигурно плащане. Ще получиш доклада си веднага след трансакцията.")
