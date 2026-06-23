@@ -10,6 +10,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Взимане на ключа автоматично от настройките на Streamlit (Secrets)
+# Ако няма ключ в настройките, ще използва празен стринg
+api_key = st.secrets.get("OPENAI_API_KEY", "")
+
 # Инициализация на данните в сесията
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
 if "price" not in st.session_state: st.session_state.price = 50
@@ -58,20 +62,15 @@ with tab1:
         with col1:
             st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
         with col2:
-            st.metric(label="Минимум оборот", value=f"{min_turnover} евро")
+            st.metric(label="Минимум оборот", value=f"{min_turnover} лв.")
             
         st.info(f"💡 Това означава средно по **{be_units/30:.1f} продажби на ден**, за да излезеш на нула.")
 
 # ==========================================
-# ТАБ 2: AI ВАЛИДАЦИЯ (МОДЕЛ С ПЛАЩАНЕ ЗА ДОКЛАД)
+# ТАБ 2: AI ВАЛИДАЦИЯ (АВТОМАТИЧЕН РЕЖИМ)
 # ==========================================
 with tab2:
     st.subheader("🤖 Запиши идеята си")
-    st.write("Въведи твоя OpenAI API ключ в полето, за да активираш учения ментор:")
-    
-    api_key = st.text_input("Въведи OpenAI API Key:", type="password")
-    
-    st.markdown("---")
     st.write("🎙️ **Запиши гласово описание на бизнеса си или го напиши от клавиатурата:**")
     
     audio_file = st.audio_input("Запиши гласово описание")
@@ -79,7 +78,7 @@ with tab2:
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
         if not api_key:
-            st.error("🔑 Моля, постави твоя OpenAI API ключ в полето горе.")
+            st.error("🔑 Липсва OpenAI API ключ в настройките на системата. Моля, добави го в Secrets.")
         else:
             final_concept = ""
             if audio_file is not None:
@@ -103,7 +102,7 @@ with tab2:
                         
                         free_prompt = f"""
                         Ти си бизнес консултант. Направи КРАТЪК предварителен преглед (до 3 изречения) на тази бизнес идея: '{final_concept}'.
-                        Финанси: Месечен разход {st.session_state.fixed_costs} евро Нужни продажби: {be_units} бр.
+                        Финанси: Месечен разход {st.session_state.fixed_costs} лв. Нужни продажби: {be_units} бр.
                         Дай само бърза оценка дали финансовата цел изглежда лесна или трудна за българския пазар. Бъди позитивен, но реалист.
                         """
                         
@@ -127,7 +126,7 @@ with tab2:
                         """)
                         
                         stripe_link = "https://buy.stripe.com/your_custom_payment_link" 
-                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", stripe_link, use_container_width=True)
+                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 лв.", stripe_link, use_container_width=True)
                         
                         st.caption("🔒 Сигурно плащане. Ще получиш доклада си веднага след трансакцията.")
                         
