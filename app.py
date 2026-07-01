@@ -30,7 +30,6 @@ ga_html = f"""
   }}
 </script>
 """
-# Използваме st.markdown в комбинация с уловка, за да изкараме скрипта от изолация
 st.markdown(f'<div style="display:none;">{ga_html}</div>', unsafe_allow_html=True)
 # ==================================
 
