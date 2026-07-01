@@ -40,7 +40,7 @@ with tab1:
     
     st.session_state.price = st.slider(
         "💰 Продажна цена за 1 бройка / час", 
-        min_value=5, max_value=500, value=st.session_state.price, step=5
+        min_value=0.5, max_value=500, value=st.session_state.price, step=5
     )
     
     st.session_state.cost = st.slider(
