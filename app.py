@@ -11,7 +11,6 @@ st.set_page_config(
 )
 
 # Взимане на ключа автоматично от настройките на Streamlit (Secrets)
-# Ако няма ключ в настройките, ще използва празен стринg
 api_key = st.secrets.get("OPENAI_API_KEY", "")
 
 # Инициализация на данните в сесията
@@ -78,7 +77,7 @@ with tab2:
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
         if not api_key:
-            st.error("🔑 Липсва OpenAI API ключ в настройките на системата. Моля, добави го в Secrets.")
+            st.error("🔑 Липсва OpenAI API ключ в настройките на systemата. Моля, добави го в Secrets.")
         else:
             final_concept = ""
             if audio_file is not None:
@@ -134,4 +133,3 @@ with tab2:
                         st.error(f"Грешка при връзката с AI: {e}")
             else:
                 st.warning("⚠️ Моля, въведете текст или направете запис.")
-
