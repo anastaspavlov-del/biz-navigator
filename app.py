@@ -1,7 +1,7 @@
 import streamlit as st
 import math
 from openai import OpenAI
-import streamlit.components.v1 as components
+import requests  # <- ТОВА Е ВАЖНОТО, ЗА ДА НЕ ДАВА ГРЕШКА!
 
 # 1. Оптимизация за мобилни устройства
 st.set_page_config(
@@ -11,14 +11,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# === ГАРАНТИРАНА СЪРВЪРНА ИНТЕГРАЦИЯ С GOOGLE ANALYTICS ===
-import requests
-
+# === СЪРВЪРНА ИНТЕГРАЦИЯ С GOOGLE ANALYTICS ===
 GA_ID = "G-ZSYHC5TEW3"
 
 def track_ga_event(event_name):
     """Изпраща сигнал директно от сървъра към Google Analytics, заобикаляйки защитите на Streamlit"""
-    # Използваме Measurement Protocol на Google
     url = f"https://www.google-analytics.com/mp/collect?measurement_id={GA_ID}&api_secret=dummy_secret"
     payload = {
         "client_id": "streamlit_user_session",
