@@ -2,7 +2,7 @@ import streamlit as st
 import math
 from openai import OpenAI
 
-# 1. Оптимизация за мобилни устройства
+# 1. Page Configuration
 st.set_page_config(
     page_title="Бизнес Навигатор", 
     page_icon="🚀", 
@@ -10,24 +10,22 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Взимане на ключа автоматично от настройките на Streamlit (Secrets)
+# API Key Check
 api_key = st.secrets.get("OPENAI_API_KEY", "")
 
-# Инициализация на данните в сесията
+# Session State Initialization
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
 if "price" not in st.session_state: st.session_state.price = 50
 if "cost" not in st.session_state: st.session_state.cost = 20
 
-# Заглавие на приложението
+# UI Header
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# Създаване на табовете
+# Tabs
 tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
 
-# ==========================================
-# ТАБ 1: ФИНАНСОВ СИМУЛАТОР
-# ==========================================
+# TAB 1: Financial Simulator
 with tab1:
     st.subheader("📱 Финансов симулатор")
     st.write("Нагласи слайдерите с пръст, за да видиш минимума за оцеляване:")
@@ -65,9 +63,7 @@ with tab1:
             
         st.info(f"💡 Това означава средно по **{be_units/30:.1f} продажби на ден**, за да излезеш на нула.")
 
-# ==========================================
-# ТАБ 2: AI ВАЛИДАЦИЯ (АВТОМАТИЧЕН РЕЖИМ)
-# ==========================================
+# TAB 2: AI Validation
 with tab2:
     st.subheader("🤖 Запиши идеята си")
     st.write("🎙️ **Запиши гласово описание на бизнеса си или го напиши от клавиатурата:**")
@@ -77,7 +73,7 @@ with tab2:
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
         if not api_key:
-            st.error("🔑 Липсва OpenAI API ключ в настройките на systemата. Моля, добави го в Secrets.")
+            st.error("🔑 Липсва OpenAI API ключ в настройките. Моля, добави го в Secrets.")
         else:
             final_concept = ""
             if audio_file is not None:
@@ -112,7 +108,7 @@ with tab2:
                         )
                         
                         st.markdown("---")
-                        st.markdown("### 🔓 Твоят безплатен предварителен анализ:")
+                        st.markdown("### 🔓 Твоят безплатен предваретилен анализ:")
                         st.info(response.choices[0].message.content)
                         
                         st.markdown("### 📊 Отключи Пълния Експертен Доклад")
