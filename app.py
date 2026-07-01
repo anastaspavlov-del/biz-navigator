@@ -1,6 +1,7 @@
 import streamlit as st
 import math
 from openai import OpenAI
+import streamlit.components.v1 as components
 
 # 1. Оптимизация за мобилни устройства
 st.set_page_config(
