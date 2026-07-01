@@ -40,12 +40,12 @@ with tab1:
     
     st.session_state.price = st.slider(
         "💰 Продажна цена за 1 бройка / час", 
-        min_value=1, max_value=500, value=st.session_state.price, step=1
+        min_value=0, max_value=500, value=st.session_state.price, step=1
     )
     
     st.session_state.cost = st.slider(
         "📦 Себестойност на 1 бройка (материали/доставка)", 
-        min_value=0, max_value=300, value=st.session_state.cost, step=5
+        min_value=0, max_value=300, value=st.session_state.cost, step=1
     )
     
     st.markdown("---")
