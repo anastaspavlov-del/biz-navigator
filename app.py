@@ -11,8 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# === GOOGLE ANALYTICS ИНТЕГРАЦИЯ ===
-# ЗАМЕНЕТЕ "G-XXXXXXXXXX" С ВАШИЯ ИСТИНСКИ ID ОТ GOOGLE ANALYTICS
+# === GOOGLE ANALYTICS ИНТЕГРАЦИЯ (КОРИГИРАНА) ===
 GA_ID = "G-ZSYHC5TEW3"
 
 ga_html = f"""
@@ -21,9 +20,8 @@ ga_html = f"""
   window.dataLayer = window.dataLayer || [];
   function gtag(){{dataLayer.push(arguments);}}
   gtag('js', new Date());
-  gtag('config', '{GA_ID}');
+  gtag('config', '{GA_ID}', {{ 'cookie_flags': 'SameSite=None;Secure' }});
   
-  // Функция, която ще извикваме при клик на бутона
   function trackPaymentClick() {{
     gtag('event', 'click_payment_button', {{
       'event_category': 'Engagement',
@@ -32,8 +30,8 @@ ga_html = f"""
   }}
 </script>
 """
-# Скрит компонент, който зарежда кода на Google в приложението
-components.html(ga_html, height=0, width=0)
+# Използваме st.markdown в комбинация с уловка, за да изкараме скрипта от изолация
+st.markdown(f'<div style="display:none;">{ga_html}</div>', unsafe_allow_html=True)
 # ==================================
 
 # Взимане на ключа автоматично от настройките на Streamlit (Secrets)
