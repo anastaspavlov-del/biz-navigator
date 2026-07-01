@@ -2,6 +2,10 @@ import streamlit as st
 import math
 from openai import OpenAI
 
+# Пример за проследяване с невидима картинка (Pixel tracking)
+st.markdown('<a href="/" alt="" target="_blank" >
+<img  src="//sstatic1.histats.com/0.gif?5036919&101" alt="" border="0">', unsafe_allow_html=True)
+
 # 1. Page Configuration
 st.set_page_config(
     page_title="Бизнес Навигатор", 
