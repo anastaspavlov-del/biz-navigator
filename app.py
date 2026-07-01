@@ -2,9 +2,13 @@ import streamlit as st
 import math
 from openai import OpenAI
 
-# Пример за проследяване с невидима картинка (Pixel tracking)
-st.markdown('<a href="/" alt="" target="_blank" >
-<img  src="//sstatic1.histats.com/0.gif?5036919&101" alt="" border="0">', unsafe_allow_html=True)
+# Безплатен брояч от Histats - напълно невидим за потребителя
+st.markdown(
+    '<a href="https://www.histats.com" target="_blank">'
+    '<img src="https://sstatic1.histats.com/0.gif?5036919&101" alt="Histats" border="0" style="display:none;">'
+    '</a>', 
+    unsafe_allow_html=True
+)
 
 # 1. Page Configuration
 st.set_page_config(
