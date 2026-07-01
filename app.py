@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# === GOOGLE ANALYTICS ИНТЕГРАЦИЯ (КОРИГИРАНА) ===
+# === GOOGLE ANALYTICS ИНТЕГРАЦИЯ ===
 GA_ID = "G-ZSYHC5TEW3"
 
 ga_html = f"""
@@ -21,13 +21,6 @@ ga_html = f"""
   function gtag(){{dataLayer.push(arguments);}}
   gtag('js', new Date());
   gtag('config', '{GA_ID}', {{ 'cookie_flags': 'SameSite=None;Secure' }});
-  
-  function trackPaymentClick() {{
-    gtag('event', 'click_payment_button', {{
-      'event_category': 'Engagement',
-      'event_label': 'Stripe Checkout Click'
-    }});
-  }}
 </script>
 """
 st.markdown(f'<div style="display:none;">{ga_html}</div>', unsafe_allow_html=True)
