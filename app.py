@@ -2,14 +2,6 @@ import streamlit as st
 import math
 from openai import OpenAI
 
-# Безплатен брояч от Histats - напълно невидим за потребителя
-st.markdown(
-    '<a href="https://www.histats.com" target="_blank">'
-    '<img src="https://sstatic1.histats.com/0.gif?5036919&101" alt="Histats" border="0" style="display:none;">'
-    '</a>', 
-    unsafe_allow_html=True
-)
-
 # 1. Page Configuration
 st.set_page_config(
     page_title="Бизнес Навигатор", 
@@ -18,8 +10,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Histats безплатен невидим брояч за трафик и градове
+st.markdown(
+    '<a href="https://www.histats.com" target="_blank">'
+    '<img src="https://sstatic1.histats.com/0.gif?5036919&101" alt="Histats" border="0" style="display:none;">'
+    '</a>', 
+    unsafe_allow_html=True
+)
+
 # API Key Check
 api_key = st.secrets.get("OPENAI_API_KEY", "")
+
+# УЛАВЯНЕ НА СИГНАЛА ЗА ПЛАЩАНЕ ОТ STRIPE
+# Проверяваме дали в линка има ?paid=true
+is_paid = st.query_params.get("paid") == "true"
 
 # Session State Initialization
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
@@ -29,6 +33,50 @@ if "cost" not in st.session_state: st.session_state.cost = 20
 # UI Header
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
+
+# Ако потребителят се връща от Stripe след плащане, показваме доклада веднага най-горе!
+if is_paid:
+    st.balloons()
+    st.success("🎉 Плащането е успешно! Твоят разширен експертен доклад се генерира...")
+    
+    if not api_key:
+        st.error("🔑 Липсва OpenAI API ключ в настройките. Добавете го в Secrets.")
+    else:
+        with st.spinner("🤖 Експертният AI консултант съставя детайлния бизнес план... (може да отнеме до 30 сек)"):
+            try:
+                client = OpenAI(api_key=api_key)
+                margin = st.session_state.price - st.session_state.cost
+                be_units = math.ceil(st.session_state.fixed_costs / margin) if margin > 0 else 0
+                min_turnover = be_units * st.session_state.price
+                
+                paid_prompt = f"""
+                Ти си топ бизнес анализатор и консултант за стартиращи компании в България. 
+                Потребителят си плати за ПЪЛЕН ЕКСПЕРТЕН ДОКЛАД за следната бизнес идея:
+                Финанси: Постоянни месечни разходи: {st.session_state.fixed_costs} евро, Цена на бройка/час: {st.session_state.price} евро, Себестойност: {st.session_state.cost} евро. Нужни продажби: {be_units} бр. за минимален оборот от {min_turnover} евро.
+                
+                Напиши структуриран, подробен и изключително професионален бизнес доклад (около 400-500 думи) на чист български език със следните секции:
+                1. ⚠️ ТОП 3 СКРИТИ РИСКА за този бизнес модел специално на българския пазар и как да бъдат избегнати.
+                2. 💸 СПИСЪК С ПРОПУСНАТИ РАЗХОДИ (счетоводство, касови апарати, патенти, лицензи, софтуер, рекламен бюджет), които не са включени в калкулатора му.
+                3. 🎯 MVP ПЛАН СТЪПКА ПО СТЪПКА: Точни действия как да тества пазара БЕЗПЛАТНО или с минимален бюджет още тази седмица, преди да инвестира пари.
+                4. 📈 МАРКЕТИНГОВА СТРАТЕГИЯ: Конкретни канали (например Meta Ads, TikTok, локално SEO) откъде и как точно да намери първите си 10 плащащи клиенти.
+                
+                Бъди конкретен, избягвай общи приказки ("Рекламата е важна"). Дай практически съвети за българската реалност. Форматирай с ясни заглавия (Bold).
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": paid_prompt}],
+                    temperature=0.7
+                )
+                
+                st.markdown("### 📊 ПЪЛЕН ЕКСПЕРТЕН БИЗНЕС ДОКЛАД")
+                st.write(response.choices[0].message.content)
+                st.markdown("---")
+                st.info("💡 Съвет: Можеш да копираш този доклад и да го запазиш в текстов документ за бъдеща референция.")
+                
+            except Exception as e:
+                st.error(f"Грешка при генериране на доклада: {e}")
+    st.markdown("---")
 
 # Tabs
 tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
@@ -116,7 +164,7 @@ with tab2:
                         )
                         
                         st.markdown("---")
-                        st.markdown("### 🔓 Твоят безплатен предваретилен анализ:")
+                        st.markdown("### 🔓 Твоят безплатен предварителен анализ:")
                         st.info(response.choices[0].message.content)
                         
                         st.markdown("### 📊 Отключи Пълния Експертен Доклад")
@@ -136,4 +184,4 @@ with tab2:
                     except Exception as e:
                         st.error(f"Грешка при връзката с AI: {e}")
             else:
-                st.warning("⚠️ Моля, въведете текст или направете запис.")
+                st.warning("⚠️ Моля, въведете текст или направете запись.")
