@@ -14,6 +14,7 @@ st.set_page_config(
 )
 
 # 🎨 СТИЛИЗИРАНЕ (CSS) ПО ДИЗАЙНА ОТ design_biz_nav.jpg
+# Премахнат е излишният аргумент unsafe_allow_html=True, за да няма TypeError
 st.html("""
 <style>
     /* Главен фон на приложението - Тъмно червен градиент */
@@ -28,7 +29,7 @@ st.html("""
         background-color: transparent;
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1a0826 !important; /* Лилаво/тъмен фон за таб */
+        background-color: #1a0826 !important;
         border-radius: 12px !important;
         padding: 10px 20px !important;
         color: #a3a3a3 !important;
@@ -36,7 +37,7 @@ st.html("""
         font-weight: bold;
     }
     .stTabs [data-baseweb="tab"]:nth-child(3) {
-        background-color: #0b5327 !important; /* Зелен таб като на картинката */
+        background-color: #0b5327 !important;
         color: white !important;
     }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
@@ -123,9 +124,9 @@ st.html("""
         transform: translateY(-2px);
     }
 </style>
-""", unsafe_allow_html=True)
+""")
 
-# Histats безплатен невидим брояч
+# Невидим брояч (тук st.markdown изисква unsafe_allow_html)
 st.markdown(
     '<a href="https://www.histats.com" target="_blank">'
     '<img src="https://sstatic1.histats.com/0.gif?5036919&101" alt="Histats" border="0" style="display:none;">'
@@ -143,7 +144,7 @@ url_price = st.query_params.get("pr")
 url_cost = st.query_params.get("cs")
 url_idea = st.query_params.get("idea", "")
 
-# Стойности по подразбиране, точно като в референцията от снимката
+# Стойности по подразбиране от снимката design_biz_nav.jpg
 init_fixed_costs = int(url_fixed_costs) if url_fixed_costs else 2000
 init_price = int(url_price) if url_price else 50
 init_cost = int(url_cost) if url_cost else 15
@@ -173,7 +174,7 @@ def create_docx(business_idea, financials, report_text):
     bio.seek(0)
     return bio.getvalue()
 
-# UI Шапка с икона ракета (същата като в горния ляв ъгъл на телефона)
+# UI Шапка с икона ракета
 col_logo, col_title = st.columns([1, 5])
 with col_logo:
     st.markdown("<h1 style='margin:0; padding:0;'>🚀</h1>", unsafe_allow_html=True)
@@ -183,7 +184,7 @@ with col_title:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# СЕКЦИЯ ПЛАТЕН ДОКЛАД (Изскача най-отгоре при успешно плащане)
+# СЕКЦИЯ ПЛАТЕН ДОКЛАД
 if is_paid:
     st.balloons()
     st.success("🎉 Плащането е успешно! Твоят персонализиран бизнес план се генерира...")
@@ -213,7 +214,7 @@ if is_paid:
             except Exception as e:
                 st.error(f"Грешка: {e}")
 
-# СЪЗДАВАНЕ НА ТАБОВЕТЕ О Т СНИМКАТА design_biz_nav.jpg
+# ТАБОВЕ
 tab1, tab2, tab3 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация", "📱 Финансов симулатор"])
 
 with tab3:
@@ -223,7 +224,7 @@ with tab3:
     # Слайдер 1
     col_lbl1, col_val1 = st.columns([3, 1])
     with col_lbl1: st.write("💼 Месечни постоянни разходи\n(наем, осигуровки)")
-    with col_val2: st.markdown(f"<div class='value-box'>{st.session_state.fixed_costs} €</div>", unsafe_allow_html=True)
+    with col_val1: st.markdown(f"<div class='value-box'>{st.session_state.fixed_costs} €</div>", unsafe_allow_html=True)
     st.session_state.fixed_costs = st.slider("fc_slider", 200, 10000, st.session_state.fixed_costs, 100, label_visibility="collapsed")
     
     # Слайдер 2
@@ -232,13 +233,13 @@ with tab3:
     with col_val2: st.markdown(f"<div class='value-box'>{st.session_state.price} €</div>", unsafe_allow_html=True)
     st.session_state.price = st.slider("pr_slider", 5, 500, st.session_state.price, 1, label_visibility="collapsed")
     
-    # Слайдер 3
+    # Слайдер 3 (Поправено именуване на променливите col_val)
     col_lbl3, col_val3 = st.columns([3, 1])
     with col_lbl3: st.write("📦 Себестойност на 1 бройка\n(материали/доставка)")
     with col_val3: st.markdown(f"<div class='value-box'>{st.session_state.cost} €</div>", unsafe_allow_html=True)
     st.session_state.cost = st.slider("cs_slider", 0, 300, st.session_state.cost, 1, label_visibility="collapsed")
 
-    # ИЗЧИСЛЕНИЯ И ИЗВЕЖДАНЕ НА РЕЗУЛТАТИТЕ
+    # ИЗЧИСЛЕНИЯ
     margin = st.session_state.price - st.session_state.cost
     if margin <= 0:
         st.error("🛑 Цената трябва да е по-висока от себестойността!")
@@ -247,7 +248,7 @@ with tab3:
         min_turnover = be_units * st.session_state.price
         daily_sales = be_units / 30
         
-        # Резултатен блок от долната част на екрана в design_biz_nav.jpg
+        # Резултатен блок
         st.markdown(f"""
         <div class='result-container'>
             <p style='font-weight:bold; font-size:1.1rem; margin-bottom:15px;'>Резултат за твоя бизнес:</p>
@@ -276,7 +277,7 @@ with tab2:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Големият долен зелен бутон "Анализирай моята идея"
+# Големият бутон
 if st.button("🧠 Анализирай моята идея", use_container_width=True):
     if len(st.session_state.idea_text) < 5:
         st.warning("⚠️ Моля, въведете първо описание на вашата бизнес идея в Таб '2. AI Валидация'.")
