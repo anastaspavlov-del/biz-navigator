@@ -1,7 +1,9 @@
 import streamlit as st
 import math
 from openai import OpenAI
-import urllib.parse  # За правилно кодиране на текста в линка
+import urllib.parse
+from docx import Document  # Добавяме библиотеката за Word документи
+from io import BytesIO
 
 # 1. Page Configuration
 st.set_page_config(
@@ -29,7 +31,7 @@ url_price = st.query_params.get("pr")
 url_cost = st.query_params.get("cs")
 url_idea = st.query_params.get("idea", "")
 
-# Ако потребителят е платил и има данни в URL, взимаме тях. Ако липсват, слагаме дефолтни.
+# Парсване на данните
 init_fixed_costs = int(url_fixed_costs) if url_fixed_costs else 1200
 init_price = int(url_price) if url_price else 50
 init_cost = int(url_cost) if url_cost else 20
@@ -41,6 +43,43 @@ if "price" not in st.session_state: st.session_state.price = init_price
 if "cost" not in st.session_state: st.session_state.cost = init_cost
 if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
 
+# Функция за генериране на Word (.docx) документ
+def create_docx(business_idea, financials, report_text):
+    doc = Document()
+    
+    # Заглавие на документа
+    doc.add_heading("БИЗНЕС НАВИГАТОР - ЕКСПЕРТЕН ДОКЛАД", level=0)
+    
+    # Бърза информация за проекта
+    doc.add_heading("Обща информация", level=1)
+    doc.add_paragraph(f"Бизнес идея: {business_idea}")
+    doc.add_paragraph(f"Финансови параметри:\n"
+                      f"- Постоянни месечни разходи: {financials['fc']} евро\n"
+                      f"- Продажна цена: {financials['pr']} евро\n"
+                      f"- Себестойност: {financials['cs']} евро\n"
+                      f"- Нужни продажби за нулата: {financials['be']} бр./месец")
+    
+    doc.add_paragraph("\n" + "="*40 + "\n")
+    
+    # Добавяне на генерирания текст
+    doc.add_heading("Подробен анализ и план за действие", level=1)
+    
+    # Разделяме текста по редове, за да запазим абзаците
+    for paragraph in report_text.split("\n"):
+        if paragraph.strip():
+            # Ако редът започва с ###, го правим подзаглавие в Word
+            if paragraph.strip().startswith("###"):
+                clean_title = paragraph.replace("###", "").strip()
+                doc.add_heading(clean_title, level=2)
+            else:
+                doc.add_paragraph(paragraph.strip())
+                
+    # Запазваме документа в байтов поток в паметта, за да може Streamlit да го изтегли
+    bio = BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio.getvalue()
+
 # UI Header
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
@@ -50,7 +89,6 @@ if is_paid:
     st.balloons()
     st.success("🎉 Плащането е успешно! Твоят персонализиран бизнес план се генерира...")
     
-    # Използваме изпратената през URL идея или тази от сесията
     current_idea = init_idea if init_idea else st.session_state.idea_text
     
     if not current_idea or len(current_idea) < 5:
@@ -60,7 +98,7 @@ if is_paid:
     if not api_key:
         st.error("🔑 Липсва OpenAI API ключ в настройките. Добавете го в Secrets.")
     else:
-        with st.spinner("🤖 Експертният AI консултант анализира ТВОЯТА идея... (може да отнеме до 30 сек)"):
+        with st.spinner("🤖 Експертният AI консултант анализира ТВОЯТА идея..."):
             try:
                 client = OpenAI(api_key=api_key)
                 margin = st.session_state.price - st.session_state.cost
@@ -76,12 +114,12 @@ if is_paid:
                 ВЪВЕДЕНИ ФИНАНСИ ОТ ПОТРЕБИТЕЛЯ:
                 - Постоянни месечни разходи: {st.session_state.fixed_costs} евро
                 - Продажна цена на бройка/час: {st.session_state.price} евро
-                - Себестойност на бройка/минимален разход: {st.session_state.cost} евро
+                - Себестойност на бройка/минимален разход: {st.session_state.cost} euro
                 - Точка на баланса (Break-even): Нужни са точно {be_units} продажби на месец за оборот от {min_turnover} евро.
                 
-                Докладът ТРЯБВА да е дълъг и да съдържа следните 4 големи раздела, форматирани с ясни заглавия (Markdown):
+                Докладът ТРЯБВА да е дълъг и да съдържа следните 3 големи раздела с тези точни заглавия:
                 
-                ### 📊 ЧАСТ 1: ПЕРСОНАЛИЗИРАН АНАЛИЗ ЗА "{current_idea}"
+                ### 📊 ЧАСТ 1: ПЕРСОНАЛИЗИРАН АНАЛИЗ
                 - СИЛНИ СТРАНИ: Кои са 3-те най-големи стратегически предимства на този конкретен модел?
                 - СКРИТИ РИСКОВЕ: Кои са 3-те най-големи опасности специално за този бизнес на българския пазар (данъци, скрита конкуренция, регулации) и как ТОЧНО да бъдат избегнати?
                 
@@ -106,18 +144,23 @@ if is_paid:
                 st.markdown(full_report)
                 st.markdown("---")
                 
-                # 📥 СВАЛЯНЕ КАТО ПЪЛЕН ДОКУМЕНТ (ПЕРФЕКТНА КИРИЛИЦА)
-                file_content = f"БИЗНЕС НАВИГАТОР - ЕКСПЕРТЕН ДОКЛАД\n" \
-                               f"Идея: {current_idea}\n" \
-                               f"Финанси: Разходи {st.session_state.fixed_costs}€, Цена {st.session_state.price}€\n" \
-                               f"=========================================\n\n" \
-                               f"{full_report}"
+                # Подготовка на данните за функцията за Word
+                fin_data = {
+                    "fc": st.session_state.fixed_costs,
+                    "pr": st.session_state.price,
+                    "cs": st.session_state.cost,
+                    "be": be_units
+                }
                 
+                # Генериране на .docx документа в паметта
+                docx_bytes = create_docx(current_idea, fin_data, full_report)
+                
+                # 📥 БУТОН ЗА СВАЛЯНЕ ВЪВ WORD (.docx) ФОРМАТ
                 st.download_button(
-                    label="📥 Изтегли Бизнес плана + Чек-листа (.txt формат)",
-                    data=file_content.encode('utf-8'),
-                    file_name="Business_Plan_Report.txt",
-                    mime="text/plain",
+                    label="📥 Изтегли Бизнес плана в редактируем Word (.docx) формат",
+                    data=docx_bytes,
+                    file_name="Business_Plan_Report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                 )
                 
@@ -155,7 +198,7 @@ with tab1:
         be_units = math.ceil(st.session_state.fixed_costs / margin)
         min_turnover = be_units * st.session_state.price
         
-        st.markdown("#### **Резултат за твоя бизнес:**")
+        st.markdown("#### **Резултат за твоя business:**")
         col1, col2 = st.columns(2)
         with col1:
             st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
@@ -202,10 +245,8 @@ with tab2:
                     
                     st.markdown("### 📊 Отключи Пълния Експертен Доклад")
                     
-                    # 🔗 СГЛОБЯВАНЕ НА ДИНАМИЧНИЯ ЛИНК С ДАННИТЕ НА ПОТРЕБИТЕЛЯ
                     encoded_idea = urllib.parse.quote(text_idea)
                     
-                    # В реалния Stripe променяте линка тук, но за вашия тест:
                     dynamic_url = f"https://biz-navigator.streamlit.app/?paid=true" \
                                   f"&fc={st.session_state.fixed_costs}" \
                                   f"&pr={st.session_state.price}" \
@@ -213,8 +254,6 @@ with tab2:
                                   f"&idea={encoded_idea}"
                     
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
-                    
-                    # Бутон, който симулира/пренасочва с реалните данни
                     st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
                     
                 except Exception as e:
