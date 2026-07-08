@@ -1,6 +1,7 @@
 import streamlit as st
 import math
 from openai import OpenAI
+import stripe  # Добавяме библиотеката за сигурна връзка със Stripe
 import urllib.parse
 from docx import Document  # Добавяме библиотеката за Word документи
 from io import BytesIO
@@ -21,11 +22,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# API Key Check
+# API Keys Check от Secrets
 api_key = st.secrets.get("OPENAI_API_KEY", "")
+stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
 # 📥 УЛАВЯНЕ НА ДИНАМИЧНИТЕ ДАННИ ОТ URL СЛЕД ПЛАЩАНЕ
-is_paid = st.query_params.get("paid") == "true"
+# Вече търсим session_id вместо paid=true
+session_id = st.query_params.get("session_id")
 url_fixed_costs = st.query_params.get("fc")
 url_price = st.query_params.get("pr")
 url_cost = st.query_params.get("cs")
@@ -42,6 +45,18 @@ if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fi
 if "price" not in st.session_state: st.session_state.price = init_price
 if "cost" not in st.session_state: st.session_state.cost = init_cost
 if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
+
+# Функция за валидация на плащането директно през API на Stripe
+def verify_stripe_payment(session_id):
+    if not session_id:
+        return False
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status == "paid":
+            return True
+    except Exception as e:
+        st.error(f"Грешка при проверка на плащането в Stripe: {e}")
+    return False
 
 # Функция за генериране на Word (.docx) документ
 def create_docx(business_idea, financials, report_text):
@@ -84,15 +99,21 @@ def create_docx(business_idea, financials, report_text):
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# 🔥 ГЕНЕРИРАНЕ НА ДОКЛАДА С РЕАЛНИТЕ ДАННИ
-if is_paid:
+# 🔒 ИЗПЪЛНЕНИЕ НА СИГУРНАТА ПРОВЕРКА
+is_payment_valid = False
+if session_id:
+    with st.spinner("🔒 Проверка на плащането със Stripe..."):
+        is_payment_valid = verify_stripe_payment(session_id)
+
+# 🔥 ГЕНЕРИРАНЕ НА ДОКЛАДА САМО ПРИ ДОКАЗАНО ПЛАЩАНЕ
+if is_payment_valid:
     st.balloons()
-    st.success("🎉 Плащането е успешно! Твоят персонализиран бизнес план се генерира...")
+    st.success("🎉 Плащането е потвърдено успешно! Твоят персонализиран бизнес план се генерира...")
     
     current_idea = init_idea if init_idea else st.session_state.idea_text
     
     if not current_idea or len(current_idea) < 5:
-        st.warning("⚠️ Не намерихме запазено текстово описание на идеята. Използваме финансовите параметри за анализ.")
+        st.warning("⚠️ Не намерихме запазено текстово описание на идеята. Използмаве финансовите параметри за анализ.")
         current_idea = "Бизнес модел на база финансови калкулации."
 
     if not api_key:
@@ -132,6 +153,7 @@ if is_paid:
                 Бъди максимално конкретен, цитирай цифрите му и избягвай общи приказки.
                 """
                 
+                # Използваме актуалния модел gpt-4o-mini
                 response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": paid_prompt}],
@@ -166,7 +188,10 @@ if is_paid:
                 
             except Exception as e:
                 st.error(f"Грешка при генериране на доклада: {e}")
-    st.markdown("---")
+elif session_id and not is_payment_valid:
+    st.error("🛑 Предоставеният идентификатор на плащане е невалиден или не е приключил успешно.")
+
+st.markdown("---")
 
 # Tabs
 tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
@@ -247,8 +272,12 @@ with tab2:
                     
                     encoded_idea = urllib.parse.quote(text_idea)
                     
-                    dynamic_url = f"https://biz-navigator.streamlit.app/?paid=true" \
-                                  f"&fc={st.session_state.fixed_costs}" \
+                    # 🔗 ЗАМЯНА НА ЛИНКА СЪС STRIPE PAYMENT LINK
+                    # Заменете долния примерен линк с Вашия истински Payment Link от Stripe
+                    stripe_link = "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00"
+                    
+                    # Предаваме стойностите към Stripe, който след това ще ги върне към нашия редирект URL
+                    dynamic_url = f"{stripe_link}?fc={st.session_state.fixed_costs}" \
                                   f"&pr={st.session_state.price}" \
                                   f"&cs={st.session_state.cost}" \
                                   f"&idea={encoded_idea}"
