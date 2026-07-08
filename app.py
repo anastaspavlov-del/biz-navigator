@@ -28,8 +28,8 @@ stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
 # 📥 УЛАВЯНЕ НА ДАННИТЕ ОТ URL
 session_id = st.query_params.get("session_id")
-url_fin = st.query_params.get("fin", "")      # Пренася "fc|pr|cs" в един параметър
-url_idea = st.query_params.get("idea", "")    # Втори параметър за идеята
+url_fin = st.query_params.get("fin", "")      
+url_idea = st.query_params.get("idea", "")    
 
 # Базови стойности по подразбиране
 init_fixed_costs = 1200
@@ -37,7 +37,7 @@ init_price = 50
 init_cost = 20
 init_idea = ""
 
-# Разкодиране на сдвоения финансов параметър, ако съществува в URL
+# Разкодиране (ако все пак има валидни данни в URL)
 if url_fin and "{" not in url_fin and "|" in url_fin:
     try:
         parts = url_fin.split("|")
@@ -51,15 +51,25 @@ if url_fin and "{" not in url_fin and "|" in url_fin:
 if url_idea and "{" not in url_idea:
     init_idea = urllib.parse.unquote(url_idea)
 
-# ИНИЦИАЛИЗАЦИЯ НА SESSION STATE (Прави се само веднъж при зареждане)
-if "fixed_costs" not in st.session_state: 
-    st.session_state.fixed_costs = init_fixed_costs
-if "price" not in st.session_state: 
-    st.session_state.price = init_price
-if "cost" not in st.session_state: 
-    st.session_state.cost = init_cost
-if "idea_text" not in st.session_state: 
-    st.session_state.idea_text = init_idea
+# ИНИЦИАЛИЗАЦИЯ НА SESSION STATE
+# Ако потребителят сега отваря сайта, слагаме базовите или уловените от URL стойности
+if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
+if "price" not in st.session_state: st.session_state.price = init_price
+if "cost" not in st.session_state: st.session_state.cost = init_cost
+if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
+
+# 🌟 КЛЮЧОВАТА КОРЕКЦИЯ:
+# Ако се връщаме от плащане (има session_id), но параметрите в URL са счупени от Stripe (както в твоя случай),
+# НЕ презаписваме session_state с дефолтните стойности! 
+# Streamlit ще запази това, което потребителят сам е симулирал в слайдерите точно преди да натисне "Плати".
+if session_id:
+    # Проверяваме дали в URL все пак има РЕАЛНИ числа (а не cs_test текста от Stripe)
+    if url_fin and "|" in url_fin and not url_fin.startswith("cs_"):
+        st.session_state.fixed_costs = init_fixed_costs
+        st.session_state.price = init_price
+        st.session_state.cost = init_cost
+    if init_idea and not init_idea.startswith("cs_"):
+        st.session_state.idea_text = init_idea
 
 # АКО ПОТРЕБИТЕЛЯТ СЕ ВРЪЩА ОТ СТРАНИЦАТА ЗА ПЛАЩАНЕ (Има session_id), 
 # ТРЯБВА ДА ПРЕЗАПИШЕМ СЕСИЯТА С ДАННИТЕ ОТ URL, ЗАЩОТО СТАРАТА СЕСИЯ Е ИЗТРИТА.
