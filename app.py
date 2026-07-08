@@ -37,7 +37,7 @@ init_price = 50
 init_cost = 20
 init_idea = ""
 
-# Разкодиране на сдвоения финансов параметър, ако съществува
+# Разкодиране на сдвоения финансов параметър, ако съществува в URL
 if url_fin and "{" not in url_fin and "|" in url_fin:
     try:
         parts = url_fin.split("|")
@@ -51,14 +51,19 @@ if url_fin and "{" not in url_fin and "|" in url_fin:
 if url_idea and "{" not in url_idea:
     init_idea = urllib.parse.unquote(url_idea)
 
-# Инициализация на Session State
-if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
-if "price" not in st.session_state: st.session_state.price = init_price
-if "cost" not in st.session_state: st.session_state.cost = init_cost
-if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
+# ИНИЦИАЛИЗАЦИЯ НА SESSION STATE (Прави се само веднъж при зареждане)
+if "fixed_costs" not in st.session_state: 
+    st.session_state.fixed_costs = init_fixed_costs
+if "price" not in st.session_state: 
+    st.session_state.price = init_price
+if "cost" not in st.session_state: 
+    st.session_state.cost = init_cost
+if "idea_text" not in st.session_state: 
+    st.session_state.idea_text = init_idea
 
-# Директно обновяване при завръщане от плащане
-if url_fin and "|" in url_fin and "{" not in url_fin:
+# АКО ПОТРЕБИТЕЛЯТ СЕ ВРЪЩА ОТ СТРАНИЦАТА ЗА ПЛАЩАНЕ (Има session_id), 
+# ТРЯБВА ДА ПРЕЗАПИШЕМ СЕСИЯТА С ДАННИТЕ ОТ URL, ЗАЩОТО СТАРАТА СЕСИЯ Е ИЗТРИТА.
+if session_id:
     st.session_state.fixed_costs = init_fixed_costs
     st.session_state.price = init_price
     st.session_state.cost = init_cost
@@ -80,9 +85,11 @@ def verify_stripe_payment(sid):
 is_payment_valid = False
 if session_id:
     with st.spinner("🔒 Проверка на статуса на плащането..."):
-        is_payment_valid = verify_stripe_payment(session_id)
+        # Тестова среда пропуска истинската проверка, ако си в тестов режим
         if session_id.startswith("cs_test"):
             is_payment_valid = True
+        else:
+            is_payment_valid = verify_stripe_payment(session_id)
 
 # Функция за генериране на Word (.docx) документ
 def create_docx(business_idea, financials, report_text):
@@ -200,9 +207,10 @@ tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валида�
 # TAB 1: Financial Simulator
 with tab1:
     st.subheader("📱 Финансов симулатор")
-    st.session_state.fixed_costs = st.slider("💼 Месечни постоянни разходи", min_value=200, max_value=10000, value=st.session_state.fixed_costs, step=100)
-    st.session_state.price = st.slider("💰 Продажна цена за 1 бройка / час", min_value=0, max_value=500, value=st.session_state.price, step=1)
-    st.session_state.cost = st.slider("📦 Себестойност на 1 бройка", min_value=0, max_value=300, value=st.session_state.cost, step=1)
+    # Използваме key="fixed_costs", за да се върже директно и двупосочно със session_state
+    st.slider("💼 Месечни постоянни разходи", min_value=200, max_value=10000, step=100, key="fixed_costs")
+    st.slider("💰 Продажна цена за 1 бройка / час", min_value=0, max_value=500, step=1, key="price")
+    st.slider("📦 Себестойност на 1 бройка", min_value=0, max_value=300, step=1, key="cost")
     
     if st.session_state.price <= st.session_state.cost:
         st.error("🛑 Цената трябва да е по-висока от себестойността!")
@@ -218,8 +226,8 @@ with tab1:
 # TAB 2: AI Validation
 with tab2:
     st.subheader("🤖 Запиши идеята си")
-    text_idea = st.text_area("Напиши или коригирай идеята си тук:", value=st.session_state.idea_text, placeholder="Пример: Искам да отворя автомивка...")
-    st.session_state.idea_text = text_idea
+    # Използваме key="idea_text", за автоматична синхронизация
+    text_idea = st.text_area("Напиши или коригирай идеята си тук:", placeholder="Пример: Искам да отворя автомивка...", key="idea_text")
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
         if not api_key:
@@ -240,8 +248,6 @@ with tab2:
                     st.markdown("### 📊 Отключи Пълния Експертен Доклад")
                     
                     encoded_idea = urllib.parse.quote(text_idea)
-                    
-                    # Събираме трите числа в ОДИН параметър "fin"
                     fin_payload = f"{st.session_state.fixed_costs}|{st.session_state.price}|{st.session_state.cost}"
                     
                     stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
