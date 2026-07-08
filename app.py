@@ -274,7 +274,7 @@ with tab2:
                     
                     # 🔗 ЗАМЯНА НА ЛИНКА СЪС STRIPE PAYMENT LINK
                     # Заменете долния примерен линк с Вашия истински Payment Link от Stripe
-                    stripe_link = "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00"
+                    stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
                     
                     # Предаваме стойностите към Stripe, който след това ще ги върне към нашия редирект URL
                     dynamic_url = f"{stripe_link}?fc={st.session_state.fixed_costs}" \
