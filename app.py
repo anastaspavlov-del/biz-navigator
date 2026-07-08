@@ -26,64 +26,41 @@ st.markdown(
 api_key = st.secrets.get("OPENAI_API_KEY", "")
 stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
-# 📥 УЛАВЯНЕ НА ДИНАМИЧНИТЕ ДАННИ ОТ URL
+# 📥 УЛАВЯНЕ НА SESSION ID ОТ STRIPE
 session_id = st.query_params.get("session_id")
-url_fixed_costs = st.query_params.get("fc")
-url_price = st.query_params.get("pr")
-url_cost = st.query_params.get("cs")
-url_idea = st.query_params.get("idea", "")
 
-# Помощна функция за безопасно конвертиране към число
-def safe_int(value, default_val):
-    if not value:
-        return default_val
-    try:
-        # Изчистване на разстояния и символи за валута, ако има такива
-        clean_val = str(value).strip().replace("€", "").replace("$", "")
-        # Ако Stripe е върнал самия макрос като текст {URL_PARAM:...}, връщаме дефолт
-        if "{" in clean_val or "URL_PARAM" in clean_val:
-            return default_val
-        return int(float(clean_val))
-    except (ValueError, TypeError):
-        return default_val
+# Базови стойности по подразбиране
+init_fixed_costs = 1200
+init_price = 50
+init_cost = 20
+init_idea = ""
 
-# Парсване на първоначалните стойности
-init_fixed_costs = safe_int(url_fixed_costs, 1200)
-init_price = safe_int(url_price, 50)
-init_cost = safe_int(url_cost, 20)
-init_idea = urllib.parse.unquote(url_idea) if url_idea and "{" not in url_idea else ""
-
-# Инициализация на Session State (Пази въведеното от потребителя)
+# Инициализация на Session State (за да не се чупи симулатора)
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
 if "price" not in st.session_state: st.session_state.price = init_price
 if "cost" not in st.session_state: st.session_state.cost = init_cost
 if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
 
-# АКО ИМАМЕ ВЪРНАТИ ВАЛИДНИ ПАРАМЕТРИ ОТ URL, ОБНОВЯВАМЕ СЕСИЯТА ВЕДНАГА
-if url_fixed_costs and "{" not in url_fixed_costs:
-    st.session_state.fixed_costs = init_fixed_costs
-    st.session_state.price = init_price
-    st.session_state.cost = init_cost
-    if init_idea:
-        st.session_state.idea_text = init_idea
-
-# Функция за сигурна проверка на плащането в Stripe
-def verify_stripe_payment(sid):
-    if not sid:
-        return False
-    try:
-        session = stripe.checkout.Session.retrieve(sid)
-        if session.payment_status == "paid":
-            return True
-    except Exception as e:
-        st.error(f"Грешка при проверка на плащането в Stripe: {e}")
-    return False
-
-# Изпълнение на проверката при наличие на session_id
+# 🔒 СИГУРНА ПРОВЕРКА И ИЗТЕГЛЯНЕ НА ДАННИТЕ ДИРЕКТНО ОТ STRIPE СЪРВЪРА
 is_payment_valid = False
+
 if session_id:
-    with st.spinner("🔒 Проверка на статуса на плащането..."):
-        is_payment_valid = verify_stripe_payment(session_id)
+    with st.spinner("🔒 Проверка на плащането и извличане на Вашите данни..."):
+        try:
+            # Питаме Stripe за детайлите на тази сесия
+            session = stripe.checkout.Session.retrieve(session_id)
+            if session.payment_status == "paid":
+                is_payment_valid = True
+                
+                # Извличаме метаданните, които изпратихме преди плащането
+                metadata = session.get("metadata", {})
+                if metadata:
+                    st.session_state.fixed_costs = int(metadata.get("fc", init_fixed_costs))
+                    st.session_state.price = int(metadata.get("pr", init_price))
+                    st.session_state.cost = int(metadata.get("cs", init_cost))
+                    st.session_state.idea_text = urllib.parse.unquote(metadata.get("idea", init_idea))
+        except Exception as e:
+            st.error(f"Грешка при комуникация със Stripe: {e}")
 
 # Функция за генериране на Word (.docx) документ
 def create_docx(business_idea, financials, report_text):
@@ -117,7 +94,7 @@ def create_docx(business_idea, financials, report_text):
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# 🔥 ГЕНЕРИРАНЕ НА ПЕРСОНАЛИЗИРАНИЯ ДОКЛАД СЛЕД ПЛАЩАНЕ
+# 🔥 ГЕНЕРИРАНЕ НА ДОКЛАДА (ВЕЧЕ С ГАРАНТИРАНО ПЕРСОНАЛИЗИРАНИ ДАННИ)
 if is_payment_valid:
     st.balloons()
     st.success("🎉 Плащането е потвърдено успешно! Твоят персонализиран бизнес план се генерира...")
@@ -127,7 +104,7 @@ if is_payment_valid:
         current_idea = "Бизнес модел на база финансови калкулации."
 
     if not api_key:
-        st.error("🔑 Липсва OpenAI API ключ в настройките. Добавете го в Secrets.")
+        st.error("🔑 Липсва OpenAI API ключ в настройките.")
     else:
         with st.spinner("🤖 Експертният AI консултант анализира ТВОЯТА идея..."):
             try:
@@ -175,7 +152,6 @@ if is_payment_valid:
                 st.markdown(full_report)
                 st.markdown("---")
                 
-                # Подготовка на данните за Word документ
                 fin_data = {
                     "fc": st.session_state.fixed_costs,
                     "pr": st.session_state.price,
@@ -196,7 +172,7 @@ if is_payment_valid:
             except Exception as e:
                 st.error(f"Грешка при генериране на доклада: {e}")
 elif session_id and not is_payment_valid:
-    st.error("🛑 Предоставеният идентификатор на плащане е невалиден или не е преминал успешно.")
+    st.error("🛑 Плащането не може да бъде потвърдено или сесията е невалидна.")
 
 st.markdown("---")
 
@@ -279,11 +255,11 @@ with tab2:
                     # Използваме базовия сигурен Stripe линк
                     stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
                     
-                    # Динамичен адрес, предаващ параметрите напред към Stripe
-                    dynamic_url = f"{stripe_link}?fc={st.session_state.fixed_costs}" \
-                                  f"&pr={st.session_state.price}" \
-                                  f"&cs={st.session_state.cost}" \
-                                  f"&idea={encoded_idea}"
+                    # ВМЪКВАМЕ ДАННИТЕ КАТО МЕТАДАННИ (вграден Stripe стандарт за сигурност)
+                    dynamic_url = f"{stripe_link}?metadata[fc]={st.session_state.fixed_costs}" \
+                                  f"&metadata[pr]={st.session_state.price}" \
+                                  f"&metadata[cs]={st.session_state.cost}" \
+                                  f"&metadata[idea]={encoded_idea}"
                     
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
                     st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
