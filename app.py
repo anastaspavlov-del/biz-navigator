@@ -37,7 +37,7 @@ init_price = 50
 init_cost = 20
 init_idea = ""
 
-# Разкодиране (ако все пак има валидни данни в URL)
+# Разкодиране на финансовия параметър
 if url_fin and "{" not in url_fin and "|" in url_fin:
     try:
         parts = url_fin.split("|")
@@ -52,33 +52,18 @@ if url_idea and "{" not in url_idea:
     init_idea = urllib.parse.unquote(url_idea)
 
 # ИНИЦИАЛИЗАЦИЯ НА SESSION STATE
-# Ако потребителят сега отваря сайта, слагаме базовите или уловените от URL стойности
-if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
-if "price" not in st.session_state: st.session_state.price = init_price
-if "cost" not in st.session_state: st.session_state.cost = init_cost
-if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
-
-# 🌟 КЛЮЧОВАТА КОРЕКЦИЯ:
-# Ако се връщаме от плащане (има session_id), но параметрите в URL са счупени от Stripe (както в твоя случай),
-# НЕ презаписваме session_state с дефолтните стойности! 
-# Streamlit ще запази това, което потребителят сам е симулирал в слайдерите точно преди да натисне "Плати".
-if session_id:
-    # Проверяваме дали в URL все пак има РЕАЛНИ числа (а не cs_test текста от Stripe)
-    if url_fin and "|" in url_fin and not url_fin.startswith("cs_"):
-        st.session_state.fixed_costs = init_fixed_costs
-        st.session_state.price = init_price
-        st.session_state.cost = init_cost
-    if init_idea and not init_idea.startswith("cs_"):
-        st.session_state.idea_text = init_idea
-
-# АКО ПОТРЕБИТЕЛЯТ СЕ ВРЪЩА ОТ СТРАНИЦАТА ЗА ПЛАЩАНЕ (Има session_id), 
-# ТРЯБВА ДА ПРЕЗАПИШЕМ СЕСИЯТА С ДАННИТЕ ОТ URL, ЗАЩОТО СТАРАТА СЕСИЯ Е ИЗТРИТА.
+# Ако се връщаме от плащане (има session_id), ЗАДЪЛЖИТЕЛНО презаписваме с уловеното от URL-а
 if session_id:
     st.session_state.fixed_costs = init_fixed_costs
     st.session_state.price = init_price
     st.session_state.cost = init_cost
-    if init_idea:
-        st.session_state.idea_text = init_idea
+    st.session_state.idea_text = init_idea if init_idea else "Бизнес модел на база финансови калкулации."
+else:
+    # Ако е обикновено първоначално зареждане
+    if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
+    if "price" not in st.session_state: st.session_state.price = init_price
+    if "cost" not in st.session_state: st.session_state.cost = init_cost
+    if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
 
 # Функция за сигурна проверка на плащането в Stripe
 def verify_stripe_payment(sid):
@@ -95,7 +80,6 @@ def verify_stripe_payment(sid):
 is_payment_valid = False
 if session_id:
     with st.spinner("🔒 Проверка на статуса на плащането..."):
-        # Тестова среда пропуска истинската проверка, ако си в тестов режим
         if session_id.startswith("cs_test"):
             is_payment_valid = True
         else:
@@ -217,7 +201,6 @@ tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валида�
 # TAB 1: Financial Simulator
 with tab1:
     st.subheader("📱 Финансов симулатор")
-    # Използваме key="fixed_costs", за да се върже директно и двупосочно със session_state
     st.slider("💼 Месечни постоянни разходи", min_value=200, max_value=10000, step=100, key="fixed_costs")
     st.slider("💰 Продажна цена за 1 бройка / час", min_value=0, max_value=500, step=1, key="price")
     st.slider("📦 Себестойност на 1 бройка", min_value=0, max_value=300, step=1, key="cost")
@@ -236,7 +219,6 @@ with tab1:
 # TAB 2: AI Validation
 with tab2:
     st.subheader("🤖 Запиши идеята си")
-    # Използваме key="idea_text", за автоматична синхронизация
     text_idea = st.text_area("Напиши или коригирай идеята си тук:", placeholder="Пример: Искам да отворя автомивка...", key="idea_text")
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
