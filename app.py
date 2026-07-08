@@ -226,7 +226,7 @@ with tab2:
                     secret_payload = f"{st.session_state.fixed_costs}|{st.session_state.price}|{st.session_state.cost}|{encoded_idea}"
                     
                     # Използваме базовия Stripe линк, но закачаме данните към вградения параметър client_reference_id
-                    stripe_link = "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00"
+                    stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
                     dynamic_url = f"{stripe_link}?client_reference_id={secret_payload}"
                     
                     st.write("Нашият AI ще състави подробна пътна карта, чек-лист и ще те свърже с партньори за финансиране.")
