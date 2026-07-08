@@ -2,12 +2,11 @@ import streamlit as st
 import math
 import json
 import re
+import base64
 from openai import OpenAI
 import stripe
-import urllib.parse
 from docx import Document
 from io import BytesIO
-import streamlit.components.v1 as components
 
 # 1. Page Configuration
 st.set_page_config(
@@ -40,54 +39,56 @@ if "idea_text" not in st.session_state: st.session_state.idea_text = ""
 if "verified_sessions" not in st.session_state: st.session_state.verified_sessions = {}
 if "generated_reports" not in st.session_state: st.session_state.generated_reports = {}
 
-# 🌟 ПРЕНАСЯНЕ НА БИЗНЕС ИДЕЯТА ПРЕЗ STRIPE ПЛАЩАНЕТО
+CLIENT_REF_MAX_LEN = 200  # твърд лимит на Stripe за client_reference_id
+
+# 🌟 ПРЕНАСЯНЕ НА ФИНАНСИ + ИДЕЯ ПРЕЗ STRIPE ПЛАЩАНЕТО (client_reference_id)
 #
-# Финансовите стойности (fixed_costs/price/cost) се пренасят надеждно през
-# Stripe чрез client_reference_id (виж по-долу) - това е официално поддържан
-# механизъм и не зависи от браузъра на потребителя.
-#
-# Идеята (свободен текст, може да е с кирилица и по-дълга) не се събира удобно
-# в client_reference_id (лимит ~200 символа, кирилицата при URL-кодиране расте
-# драстично), затова я пазим в localStorage на браузъра и я връщаме в
-# Streamlit чрез реална навигация (window.location), а не чрез крехкия
-# postMessage("streamlit:setComponentValue") трик, който не се "хващаше"
-# обратно в Python и просто седеше като мъртъв код.
-if not session_id:
-    components.html(
-        f"""
-        <script>
-        try {{
-            localStorage.setItem('idea', {json.dumps(st.session_state.idea_text)});
-        }} catch (e) {{}}
-        </script>
-        """,
-        height=0,
-    )
-else:
-    url_idea = st.query_params.get("idea", "")
-    if url_idea:
-        st.session_state.idea_text = url_idea
-    else:
-        # Еднократен опит: ако идеята липсва в URL-а (типично след връщане от
-        # Stripe), я издърпваме от localStorage и презареждаме веднъж, за да
-        # може Streamlit да я прочете от query params при следващото зареждане.
-        components.html(
-            """
-            <script>
-            (function () {
-                try {
-                    const idea = localStorage.getItem('idea');
-                    if (idea) {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('idea', idea);
-                        window.location.replace(window.location.pathname + '?' + params.toString());
-                    }
-                } catch (e) {}
-            })();
-            </script>
-            """,
-            height=0,
+# Stripe приема в client_reference_id САМО alphanumeric, "-" и "_" (до 200
+# символа) - всичко останало "тихо" се изтрива. Затова:
+#   1. Не ползваме "|" като разделител (невалиден символ -> цялото поле пада).
+#   2. Не ползваме localStorage/components.html - той тече в iframe, чийто
+#      произход спрямо главната страница не е гарантирано same-origin, така
+#      че не е надежден начин да се пренесат данни през пълен redirect.
+#   3. Кодираме финансите И идеята заедно в JSON -> base64url (без padding),
+#      чиято азбука (A-Za-z0-9-_) съвпада точно с разрешените от Stripe знаци.
+def encode_client_ref(fixed_costs, price, cost, idea, max_len=CLIENT_REF_MAX_LEN):
+    def build(idea_text):
+        payload = json.dumps(
+            {"c": fixed_costs, "p": price, "s": cost, "i": idea_text},
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
+        return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii").rstrip("=")
+
+    encoded = build(idea)
+    idea_bytes = idea.encode("utf-8")
+    # Ако кодирането излезе над лимита (напр. дълга идея), режем побайтово,
+    # без да чупим многобайтови UTF-8 символи по средата.
+    while len(encoded) > max_len and idea_bytes:
+        idea_bytes = idea_bytes[:-1]
+        idea = idea_bytes.decode("utf-8", errors="ignore")
+        idea_bytes = idea.encode("utf-8")
+        encoded = build(idea)
+    return encoded
+
+
+def decode_client_ref(ref):
+    if not ref:
+        return None
+    try:
+        padded = ref + "=" * (-len(ref) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
+        data = json.loads(raw)
+        return {
+            "fixed_costs": int(data["c"]),
+            "price": int(data["p"]),
+            "cost": int(data["s"]),
+            "idea": str(data.get("i", "")),
+        }
+    except Exception as e:
+        print(f"[client_reference_id] Неуспешно декодиране '{ref}': {e}")
+        return None
+
 
 # Функция за сигурна проверка на плащането в Stripe (винаги през реалното Stripe API)
 def get_stripe_session(sid):
@@ -116,17 +117,14 @@ if session_id:
     else:
         st.sidebar.warning("⚠️ Неуспешна проверка на плащането. Презаредете страницата или се свържете с поддръжка.")
 
-# Прилагаме платените финансови данни (от client_reference_id) точно веднъж на сесия.
+# Прилагаме платените финанси + идея (декодирани от client_reference_id) точно веднъж на сесия.
 if is_payment_valid and st.session_state.get("applied_payment_session") != session_id:
-    ref = (stripe_session.client_reference_id or "") if stripe_session else ""
-    parts = ref.split("|")
-    if len(parts) == 3:
-        try:
-            st.session_state.fixed_costs = int(float(parts[0]))
-            st.session_state.price = int(float(parts[1]))
-            st.session_state.cost = int(float(parts[2]))
-        except (ValueError, TypeError) as e:
-            print(f"[Fin parse] Невалидни финансови данни в client_reference_id '{ref}': {e}")
+    decoded = decode_client_ref(stripe_session.client_reference_id if stripe_session else None)
+    if decoded:
+        st.session_state.fixed_costs = decoded["fixed_costs"]
+        st.session_state.price = decoded["price"]
+        st.session_state.cost = decoded["cost"]
+        st.session_state.idea_text = decoded["idea"]
     st.session_state.applied_payment_session = session_id
 
 # Функция за добавяне на параграф с поддръжка на **bold** маркиране
@@ -286,10 +284,11 @@ with tab1:
 with tab2:
     st.subheader("🤖 Запиши идеята си")
     text_idea = st.text_area(
-        "Напиши или коригирай идеята си тук:",
-        placeholder="Пример: Искам да отворя автомивка...",
+        "Напиши или коригирай идеята си тук (кратко описание в едно-две изречения):",
+        placeholder="Пример: Искам да отворя автомивка с 4 бокса в центъра на София...",
         key="idea_text",
-        max_chars=600,
+        max_chars=200,
+        help="Дръж описанието кратко - ако е твърде дълго, при плащането ще видиш бележка, че за пълния доклад се ползва само началото на текста.",
     )
 
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
@@ -310,10 +309,18 @@ with tab2:
 
                     st.markdown("### 📊 Отключи Пълния Експертен Доклад")
 
-                    # Само финансовите данни (кратки, ASCII) пътуват през client_reference_id -
-                    # официално поддържан от Stripe механизъм, който преживява редиректа.
-                    fin_payload = f"{st.session_state.fixed_costs}|{st.session_state.price}|{st.session_state.cost}"
-                    client_ref = urllib.parse.quote(fin_payload, safe="")
+                    client_ref = encode_client_ref(
+                        st.session_state.fixed_costs,
+                        st.session_state.price,
+                        st.session_state.cost,
+                        text_idea,
+                    )
+                    embedded = decode_client_ref(client_ref)
+                    if embedded and len(embedded["idea"]) < len(text_idea):
+                        st.caption(
+                            f"ℹ️ Заради ограничение на платежната система, в пълния доклад ще "
+                            f"използваме първите {len(embedded['idea'])} символа от идеята ти."
+                        )
 
                     stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
                     dynamic_url = f"{stripe_link}?client_reference_id={client_ref}"
