@@ -27,24 +27,40 @@ api_key = st.secrets.get("OPENAI_API_KEY", "")
 stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
 # 📥 УЛАВЯНЕ НА ДИНАМИЧНИТЕ ДАННИ ОТ URL СЛЕД ПЛАЩАНЕ
-# Вече търсим session_id вместо paid=true
 session_id = st.query_params.get("session_id")
 url_fixed_costs = st.query_params.get("fc")
 url_price = st.query_params.get("pr")
 url_cost = st.query_params.get("cs")
 url_idea = st.query_params.get("idea", "")
 
-# Парсване на данните
-init_fixed_costs = int(url_fixed_costs) if url_fixed_costs else 1200
-init_price = int(url_price) if url_price else 50
-init_cost = int(url_cost) if url_cost else 20
+# Безопасно парсване на данните (предпазва от ValueError)
+def safe_int(value, default):
+    if not value:
+        return default
+    try:
+        # Първо float, после int, за да улови числа като "1200.0"
+        return int(float(str(value).strip().replace("€", "").replace("$", "")))
+    except ValueError:
+        return default
+
+init_fixed_costs = safe_int(url_fixed_costs, 1200)
+init_price = safe_int(url_price, 50)
+init_cost = safe_int(url_cost, 20)
 init_idea = urllib.parse.unquote(url_idea) if url_idea else ""
 
-# Session State Initialization
-if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
-if "price" not in st.session_state: st.session_state.price = init_price
-if "cost" not in st.session_state: st.session_state.cost = init_cost
-if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
+# 🔄 АКО ИМАМЕ УСПЕШНО ПЛАЩАНЕ (ВЪРНАТ session_id), 
+# ПРЕЗАПИСВАМЕ СЕСИЯТА С ДАННИТЕ ОТ URL АДРЕСА ВЕДНАГА!
+if session_id and url_fixed_costs:
+    st.session_state.fixed_costs = init_fixed_costs
+    st.session_state.price = init_price
+    st.session_state.cost = init_cost
+    st.session_state.idea_text = init_idea
+else:
+    # Първоначално зареждане (ако потребителят сега отваря сайта за първи път)
+    if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
+    if "price" not in st.session_state: st.session_state.price = init_price
+    if "cost" not in st.session_state: st.session_state.cost = init_cost
+    if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
 
 # Функция за валидация на плащането директно през API на Stripe
 def verify_stripe_payment(session_id):
