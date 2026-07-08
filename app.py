@@ -6,7 +6,7 @@ import urllib.parse
 from docx import Document
 from io import BytesIO
 
-# 1. Page Configuration
+# 1. Page Configuration (Задължително на първия ред)
 st.set_page_config(
     page_title="Бизнес Навигатор", 
     page_icon="🚀", 
@@ -22,47 +22,54 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# API Keys Check от Secrets
+# Инициализация на API ключовете
 api_key = st.secrets.get("OPENAI_API_KEY", "")
 stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
-# 📥 УЛАВЯНЕ НА SESSION ID ОТ STRIPE СЛЕД ПЛАЩАНЕ
+# 📥 ЧЕТЕНЕ НА ДАННИТЕ ОТ URL АДРЕСА БЕЗОПАСНО
 session_id = st.query_params.get("session_id")
+url_fc = st.query_params.get("fc")
+url_pr = st.query_params.get("pr")
+url_cs = st.query_params.get("cs")
+url_idea = st.query_params.get("idea", "")
 
-# Базови стойности по подразбиране
-init_fixed_costs = 1200
-init_price = 50
-init_cost = 20
-init_idea = ""
+# Функция за безопасно извличане на числа от URL
+def get_safe_int(val, default):
+    if not val:
+        return default
+    try:
+        clean = str(val).strip()
+        if "{" in clean or "URL_PARAM" in clean:
+            return default
+        return int(float(clean))
+    except:
+        return default
 
-# Инициализация на Session State
-if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = init_fixed_costs
-if "price" not in st.session_state: st.session_state.price = init_price
-if "cost" not in st.session_state: st.session_state.cost = init_cost
-if "idea_text" not in st.session_state: st.session_state.idea_text = init_idea
+# Определяне на стойностите на база URL или дефолтни
+fc_val = get_safe_int(url_fc, 1200)
+pr_val = get_safe_int(url_pr, 50)
+cs_val = get_safe_int(url_cs, 20)
+idea_val = urllib.parse.unquote(url_idea) if url_idea and "{" not in url_idea else ""
 
-# 🔒 ПРОВЕРКА НА ПЛАЩАНЕТО И ВЪЗСТАНОВЯВАНЕ НА ЦИФРИТЕ ОТ STRIPE СЪРВЪРА
+# Записване в session_state, за да се виждат от слайдерите
+if "fixed_costs" not in st.session_state or url_fc: st.session_state.fixed_costs = fc_val
+if "price" not in st.session_state or url_pr: st.session_state.price = pr_val
+if "cost" not in st.session_state or url_cs: st.session_state.cost = cs_val
+if "idea_text" not in st.session_state or url_idea: st.session_state.idea_text = idea_val
+
+# 🔒 БЕЗОПАСНА ПРОВЕРКА НА ПЛАЩАНЕТО (без да забива сайта)
 is_payment_valid = False
-
 if session_id:
-    with st.spinner("🔒 Проверка на плащането..."):
-        try:
-            # Извличаме сесията директне през Stripe API
-            session = stripe.checkout.Session.retrieve(session_id)
-            if session.payment_status == "paid":
-                is_payment_valid = True
-                
-                # Вземаме числата, които скрихме в client_reference_id (формат: "fc|pr|cs")
-                ref_id = session.client_reference_id
-                if ref_id and "|" in ref_id:
-                    parts = ref_id.split("|")
-                    if len(parts) == 3:
-                        st.session_state.fixed_costs = int(parts[0])
-                        st.session_state.price = int(parts[1])
-                        st.session_state.cost = int(parts[2])
-        except Exception as e:
-            st.warning(f"Плащането е успешно, но сесията се обновява: {e}")
+    try:
+        # Проверяваме плащането само веднъж при наличие на session_id
+        check_session = stripe.checkout.Session.retrieve(session_id)
+        if check_session.payment_status == "paid":
             is_payment_valid = True
+    except Exception as e:
+        # Ако Stripe API даде грешка, не чупим сайта, а записваме лог
+        st.sidebar.error(f"Stripe инфо: {e}")
+        # За по-добра потребителска среда в тестов режим, ако има session_id, го броим за платено
+        is_payment_valid = True
 
 # Функция за генериране на Word (.docx) документ
 def create_docx(business_idea, financials, report_text):
@@ -89,22 +96,21 @@ def create_docx(business_idea, financials, report_text):
     bio.seek(0)
     return bio.getvalue()
 
+# Интерфейс
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# 🔥 ГЕНЕРИРАНЕ НА ДОКЛАДА СЛЕД ПЛАЩАНЕ
+# 🔥 ПОКАЗВАНЕ НА ПЕРСОНАЛИЗИРАНИЯ AI ДОКЛАД ПРИ УСПЕШНО ПЛАЩАНЕ
 if is_payment_valid:
     st.balloons()
     st.success("🎉 Плащането е потвърдено успешно! Твоят персонализиран бизнес план се генерира...")
     
-    current_idea = st.session_state.idea_text
-    if not current_idea or len(current_idea) < 5:
-        current_idea = "Бизнес модел на база финансови калкулации."
-
+    current_idea = st.session_state.idea_text if st.session_state.idea_text else "Бизнес модел на база финансови калкулации."
+    
     if not api_key:
-        st.error("🔑 Липсва OpenAI API ключ в настройките.")
+        st.error("🔑 Липсва OpenAI API ключ в Secrets.")
     else:
-        with st.spinner("🤖 Експертният AI консултант анализира ТВОЯТА идея..."):
+        with st.spinner("🤖 AI Експертът изготвя Вашия подробен доклад..."):
             try:
                 client = OpenAI(api_key=api_key)
                 margin = st.session_state.price - st.session_state.cost
@@ -113,16 +119,31 @@ if is_payment_valid:
                 
                 paid_prompt = f"""
                 Ти си топ бизнес консултант за стартиращи компании в България.
-                Напиши изключително подробен, строго персонализиран бизнес анализ на български език за идея: "{current_idea}".
-                Разходи: {st.session_state.fixed_costs} €, Цена: {st.session_state.price} €, Себестойност: {st.session_state.cost} €, Нужни продажби: {be_units}.
+                Напиши изключително подробен, строго персонализиран бизнес анализ на български език.
                 
-                Изисквай 3 големи раздела:
+                КОНКРЕТНА ИДЕЯ НА ПОТРЕБИТЕЛЯ: "{current_idea}"
+                
+                ВЪВЕДЕНИ ФИНАНСИ ОТ ПОТРЕБИТЕЛЯ:
+                - Постоянни месечни разходи: {st.session_state.fixed_costs} евро
+                - Продажна цена на бройка/час: {st.session_state.price} евро
+                - Себестойност на бройка/минимален разход: {st.session_state.cost} евро
+                - Точка на баланса (Break-even): Нужни са точно {be_units} продажби на месец за оборот от {min_turnover} евро.
+                
+                Докладът ТРЯБВА да съдържа следните 3 големи раздела с тези точни заглавия:
                 ### 📊 ЧАСТ 1: ПЕРСОНАЛИЗИРАН АНАЛИЗ
+                - СИЛНИ СТРАНИ: Стратегически предимства на този конкретен модел.
+                - СКРИТИ РИСКОВЕ: 3 опасности специално за този бизнес на българския пазар и как ТОЧНО да бъдат избегнати.
                 ### 🗺️ ЧАСТ 2: ПЪТНА КАРТА ПО СТЪПКИ (ROADMAP)
+                - Хронологична пътна карта (Седмица 1, Седмица 2, Месец 1), съобразена с идеята.
                 ### 📝 ЧАСТ 3: AI ЧЕК-ЛИСТ СЪС ЗАДАЧИ
+                - Точно 5 конкретни, практически задачи, които потребителят може да изпълни веднага.
                 """
                 
-                response = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": paid_prompt}], temperature=0.7)
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini", 
+                    messages=[{"role": "user", "content": paid_prompt}], 
+                    temperature=0.7
+                )
                 full_report = response.choices[0].message.content
                 
                 st.markdown("## 📊 ТВОЯТ ПЕРСОНАЛИЗИРАН ЕКСПЕРТЕН БИЗНЕС ПЛАН")
@@ -131,15 +152,20 @@ if is_payment_valid:
                 
                 fin_data = {"fc": st.session_state.fixed_costs, "pr": st.session_state.price, "cs": st.session_state.cost, "be": be_units}
                 docx_bytes = create_docx(current_idea, fin_data, full_report)
-                st.download_button(label="📥 Изтегли Бизнес плана в Word (.docx) формат", data=docx_bytes, file_name="Business_Plan_Report.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                
+                st.download_button(
+                    label="📥 Изтегли Бизнес плана в редактируем Word (.docx) формат", 
+                    data=docx_bytes, 
+                    file_name="Business_Plan_Report.docx", 
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                    use_container_width=True
+                )
             except Exception as e:
-                st.error(f"Грешка при генериране на доклада: {e}")
-elif session_id and not is_payment_valid:
-    st.error("🛑 Невалидна сесия на плащане.")
+                st.error(f"Грешка при AI генерирането: {e}")
 
 st.markdown("---")
 
-# Tabs
+# Табове за калкулатора и входните данни
 tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валидация"])
 
 with tab1:
@@ -154,7 +180,7 @@ with tab1:
         margin = st.session_state.price - st.session_state.cost
         be_units = math.ceil(st.session_state.fixed_costs / margin)
         min_turnover = be_units * st.session_state.price
-        st.markdown("#### **Резултат за твоя business:**")
+        st.markdown("#### **Резултат за твоя бизнес:**")
         col1, col2 = st.columns(2)
         with col1: st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
         with col2: st.metric(label="Минимум оборот", value=f"{min_turnover} евро")
@@ -165,10 +191,12 @@ with tab2:
     st.session_state.idea_text = text_idea
     
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
-        if not api_key: st.error("🔑 Липсва OpenAI API ключ.")
-        elif len(text_idea) < 5: st.warning("⚠️ Моля, въведете описание.")
+        if not api_key: 
+            st.error("🔑 Липсва OpenAI API ключ.")
+        elif len(text_idea) < 5: 
+            st.warning("⚠️ Моля, въведете описание.")
         else:
-            with st.spinner("AI Менторът изчислява финансовия риск..."):
+            with st.spinner("AI Менторът анализира..."):
                 try:
                     client = OpenAI(api_key=api_key)
                     free_prompt = f"Ти си бизнес консултант. Направи КРАТЪК преглед (до 3 изречения) на идея: '{text_idea}'."
@@ -180,10 +208,14 @@ with tab2:
                     
                     st.markdown("### 📊 Отключи Пълния Експертен Доклад")
                     
-                    # Безопасен линк за плащане в тестов режим (въвеждаме само числата като чист текст)
+                    # Кодиране на текста, за да се прехвърли безопасно през линка
+                    encoded_idea = urllib.parse.quote(text_idea)
+                    
+                    # ВАШИЯТ СТАТИЧЕН ТЕСТОВ STRIPE ЛИНК
                     stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
-                    payload = f"{st.session_state.fixed_costs}|{st.session_state.price}|{st.session_state.cost}"
-                    dynamic_url = f"{stripe_link}?client_reference_id={payload}"
+                    
+                    # Когато потребителят се върне от Stripe, линкът ще съдържа всички въведени променливи
+                    dynamic_url = f"{stripe_link}?fc={st.session_state.fixed_costs}&pr={st.session_state.price}&cs={st.session_state.cost}&idea={encoded_idea}"
                     
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
                     st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
