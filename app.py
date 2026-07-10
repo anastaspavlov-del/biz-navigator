@@ -322,7 +322,7 @@ with tab2:
                             f"използваме първите {len(embedded['idea'])} символа от идеята ти."
                         )
 
-                    stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
+                    stripe_link = "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00"
                     dynamic_url = f"{stripe_link}?client_reference_id={client_ref}"
 
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
