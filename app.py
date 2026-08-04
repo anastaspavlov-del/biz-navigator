@@ -12,7 +12,7 @@ from io import BytesIO
 st.set_page_config(
     page_title="Бизнес Навигатор",
     page_icon="🚀",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
@@ -22,6 +22,149 @@ st.markdown(
     '<img src="https://sstatic1.histats.com/0.gif?5036919&101" alt="Histats" border="0" style="display:none;">'
     '</a>',
     unsafe_allow_html=True
+)
+
+# 🎨 ВИЗУАЛНА ТЕМА (тъмно червено-черно, зелени акценти, картови контейнери)
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background:
+            radial-gradient(ellipse 90% 60% at 50% -5%, #6b0f0f 0%, transparent 60%),
+            linear-gradient(180deg, #1c0505 0%, #100202 55%, #0a0101 100%);
+    }
+    .stApp::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104' viewBox='0 0 60 104'%3E%3Cpolygon points='30,0 60,17 60,52 30,69 0,52 0,17' fill='none' stroke='%23ff6666' stroke-width='1'/%3E%3C/svg%3E");
+        background-size: 60px 104px;
+        z-index: 0;
+    }
+
+    /* --- Responsive ширина: пълен екран на десктоп, центрирано до разумен
+       максимум, пълна ширина на мобилни устройства --- */
+    [data-testid="stMainBlockContainer"] {
+        position: relative;
+        z-index: 1;
+        max-width: 900px;
+        margin: 0 auto;
+        padding-top: 1rem !important;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+    [data-testid="stHeader"] { height: 2.2rem; background: transparent; }
+    @media (max-width: 640px) {
+        [data-testid="stMainBlockContainer"] {
+            max-width: 100%;
+            padding-left: 0.8rem;
+            padding-right: 0.8rem;
+            padding-top: 0.6rem !important;
+        }
+    }
+
+    /* --- Пояснителни/вторични текстове: по-светъл цвят --- */
+    [data-testid="stCaptionContainer"] p { color: #e3cccc !important; }
+
+    /* --- Табове като "pill" бутони --- */
+    [data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 10px; border-bottom: none; }
+    [data-testid="stTabs"] [data-baseweb="tab-highlight"] { display: none; }
+    [data-testid="stTabs"] [data-baseweb="tab-border"] { display: none; }
+    [data-testid="stTab"] {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 14px;
+        padding: 10px 8px;
+        justify-content: center;
+    }
+    [data-testid="stTab"] p { font-weight: 600; font-size: 0.95rem; }
+    [data-testid="stTab"]:nth-of-type(1)[aria-selected="true"] {
+        background: linear-gradient(135deg, #3b5bfd, #2540c9);
+        border-color: transparent;
+    }
+    [data-testid="stTab"]:nth-of-type(2)[aria-selected="true"] {
+        background: linear-gradient(135deg, #9333ea, #6b21a8);
+        border-color: transparent;
+    }
+
+    /* --- Картови контейнери: st.container(key="card_...") --- */
+    div[class*="st-key-card_"] {
+        background: rgba(40, 10, 10, 0.55);
+        border: 1px solid rgba(220, 70, 70, 0.30) !important;
+        border-radius: 16px;
+        padding: 14px 16px 4px 16px;
+    }
+    .bn-label { font-weight: 600; font-size: 0.98rem; margin-bottom: 2px; }
+    .bn-sublabel { color: #e3cccc; font-size: 0.82rem; font-weight: 400; }
+
+    /* --- Слайдер зелен (допълва темата), номер-инпут да пасва на картата --- */
+    [data-testid="stNumberInput"] input {
+        background: rgba(0,0,0,0.35) !important;
+        border: 1px solid #22c55e !important;
+        color: #4ade80 !important;
+        font-weight: 700 !important;
+        font-size: 1.25rem !important;
+        border-radius: 10px !important;
+        text-align: center;
+    }
+    [data-testid="stNumberInputStepDown"], [data-testid="stNumberInputStepUp"] { display: none; }
+    /* Visually appended € sign (widget value itself stays numeric) */
+    [data-testid="stNumberInputContainer"] { position: relative; }
+    [data-testid="stNumberInputContainer"]::after {
+        content: "€";
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #4ade80;
+        font-weight: 700;
+        font-size: 1.1rem;
+        pointer-events: none;
+    }
+    [data-testid="stNumberInputField"] { padding-right: 30px !important; }
+
+    /* --- Стат карти: st.container(key="stat_...") --- */
+    div[class*="st-key-stat_"] {
+        background: rgba(40, 10, 10, 0.55);
+        border: 1px solid rgba(220, 70, 70, 0.30) !important;
+        border-radius: 16px;
+        text-align: center;
+        padding: 16px 10px !important;
+    }
+    div[class*="st-key-stat_"] [data-testid="stMarkdownContainer"] { width: 100%; text-align: center; margin-bottom: 0 !important; }
+    .bn-stat-label { color: #e7d3d3; font-size: 0.85rem; margin-bottom: 4px; text-align: center; }
+    .bn-stat-value { color: #4ade80; font-size: 2.3rem; font-weight: 800; line-height: 1.1; text-align: center; }
+    .bn-stat-unit { color: #e3cccc; font-size: 0.8rem; text-align: center; }
+
+    /* --- Tip box: st.container(key="tip_box") --- */
+    div[class*="st-key-tip_box"] {
+        background: rgba(34, 197, 94, 0.08);
+        border: 1px solid rgba(74, 222, 128, 0.35) !important;
+        border-radius: 14px;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 68px;
+        padding: 14px 16px !important;
+    }
+    div[class*="st-key-tip_box"] [data-testid="stMarkdownContainer"] { width: 100%; text-align: center; margin-bottom: 0 !important; }
+    div[class*="st-key-tip_box"] p { color: #86efac !important; margin: 0; text-align: center; }
+
+    /* --- CTA бутони (зелени, като в дизайна) --- */
+    [data-testid="stButton"] button, [data-testid="stLinkButton"] a {
+        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        padding: 0.8rem 1rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # API Keys Check от Secrets
@@ -41,16 +184,6 @@ if "generated_reports" not in st.session_state: st.session_state.generated_repor
 
 CLIENT_REF_MAX_LEN = 200  # твърд лимит на Stripe за client_reference_id
 
-# 🌟 ПРЕНАСЯНЕ НА ФИНАНСИ + ИДЕЯ ПРЕЗ STRIPE ПЛАЩАНЕТО (client_reference_id)
-#
-# Stripe приема в client_reference_id САМО alphanumeric, "-" и "_" (до 200
-# символа) - всичко останало "тихо" се изтрива. Затова:
-#   1. Не ползваме "|" като разделител (невалиден символ -> цялото поле пада).
-#   2. Не ползваме localStorage/components.html - той тече в iframe, чийто
-#      произход спрямо главната страница не е гарантирано same-origin, така
-#      че не е надежден начин да се пренесат данни през пълен redirect.
-#   3. Кодираме финансите И идеята заедно в JSON -> base64url (без padding),
-#      чиято азбука (A-Za-z0-9-_) съвпада точно с разрешените от Stripe знаци.
 def encode_client_ref(fixed_costs, price, cost, idea, max_len=CLIENT_REF_MAX_LEN):
     def build(idea_text):
         payload = json.dumps(
@@ -62,8 +195,6 @@ def encode_client_ref(fixed_costs, price, cost, idea, max_len=CLIENT_REF_MAX_LEN
 
     encoded = build(idea)
     idea_bytes = idea.encode("utf-8")
-    # Ако кодирането излезе над лимита (напр. дълга идея), режем побайтово,
-    # без да чупим многобайтови UTF-8 символи по средата.
     while len(encoded) > max_len and idea_bytes:
         idea_bytes = idea_bytes[:-1]
         idea = idea_bytes.decode("utf-8", errors="ignore")
@@ -90,14 +221,12 @@ def decode_client_ref(ref):
         return None
 
 
-# Функция за сигурна проверка на плащането в Stripe (винаги през реалното Stripe API)
 def get_stripe_session(sid):
     if not sid:
         return None
     try:
         return stripe.checkout.Session.retrieve(sid)
     except Exception as e:
-        # Не показваме суровата грешка на потребителя - само в сървърния лог.
         print(f"[Stripe] Грешка при извличане на сесия {sid}: {e}")
         return None
 
@@ -117,7 +246,6 @@ if session_id:
     else:
         st.sidebar.warning("⚠️ Неуспешна проверка на плащането. Презаредете страницата или се свържете с поддръжка.")
 
-# Прилагаме платените финанси + идея (декодирани от client_reference_id) точно веднъж на сесия.
 if is_payment_valid and st.session_state.get("applied_payment_session") != session_id:
     decoded = decode_client_ref(stripe_session.client_reference_id if stripe_session else None)
     if decoded:
@@ -127,7 +255,6 @@ if is_payment_valid and st.session_state.get("applied_payment_session") != sessi
         st.session_state.idea_text = decoded["idea"]
     st.session_state.applied_payment_session = session_id
 
-# Функция за добавяне на параграф с поддръжка на **bold** маркиране
 def add_formatted_paragraph(doc, text):
     p = doc.add_paragraph()
     parts = re.split(r"(\*\*.+?\*\*)", text)
@@ -141,7 +268,6 @@ def add_formatted_paragraph(doc, text):
             p.add_run(part)
     return p
 
-# Функция за генериране на Word (.docx) документ
 def create_docx(business_idea, financials, report_text):
     doc = Document()
     doc.add_heading("БИЗНЕС НАВИГАТОР - ЕКСПЕРТЕН ДОКЛАД", level=0)
@@ -168,10 +294,42 @@ def create_docx(business_idea, financials, report_text):
     bio.seek(0)
     return bio.getvalue()
 
+def synced_metric(key, label_html, min_v, max_v, step, help_text=None):
+    """Слайдер + число, синхронизирани в двете посоки, увити в стилизирана карта."""
+    slider_key = f"{key}__slider"
+    num_key = f"{key}__num"
+    if slider_key not in st.session_state:
+        st.session_state[slider_key] = st.session_state[key]
+    if num_key not in st.session_state:
+        st.session_state[num_key] = st.session_state[key]
+
+    def _from_slider():
+        v = st.session_state[slider_key]
+        st.session_state[key] = v
+        st.session_state[num_key] = v
+
+    def _from_num():
+        v = max(min_v, min(max_v, st.session_state[num_key]))
+        st.session_state[key] = v
+        st.session_state[slider_key] = v
+        st.session_state[num_key] = v
+
+    with st.container(border=True, key=f"card_{key}"):
+        st.markdown(f'<div class="bn-label">{label_html}</div>', unsafe_allow_html=True)
+        col_slider, col_num = st.columns([2.4, 1], vertical_alignment="center")
+        with col_slider:
+            st.slider("", min_value=min_v, max_value=max_v, step=step,
+                       key=slider_key, on_change=_from_slider, label_visibility="collapsed",
+                       help=help_text)
+        with col_num:
+            st.number_input("", min_value=min_v, max_value=max_v, step=step,
+                             key=num_key, on_change=_from_num, label_visibility="collapsed")
+    return st.session_state[key]
+
+
 st.title("🚀 Бизнес Навигатор")
 st.caption("Твоят дигитален стартъп ментор")
 
-# 🔥 ГЕНЕРИРАНЕ НА ПЕРСОНАЛИЗИРАНИЯ ДОКЛАД СЛЕД ПЛАЩАНЕ
 if is_payment_valid:
     st.balloons()
     st.success("🎉 Плащането е потвърдено успешно! Твоят персонализиран бизнес план се генерира...")
@@ -265,9 +423,23 @@ tab1, tab2 = st.tabs(["📊 1. Сметни риск", "💡 2. AI Валида�
 # TAB 1: Financial Simulator
 with tab1:
     st.subheader("📱 Финансов симулатор")
-    st.slider("💼 Месечни постоянни разходи", min_value=200, max_value=10000, step=100, key="fixed_costs")
-    st.slider("💰 Продажна цена за 1 бройка / час", min_value=0, max_value=500, step=1, key="price")
-    st.slider("📦 Себестойност на 1 бройка", min_value=0, max_value=300, step=1, key="cost")
+    st.caption("Нагласи слайдерите или въведи стойност на ръка, за да видиш минимума за оцеляване:")
+
+    synced_metric(
+        "fixed_costs",
+        "💼 Месечни постоянни разходи<br><span class='bn-sublabel'>(наем, осигуровки)</span>",
+        min_v=200, max_v=10000, step=100,
+    )
+    synced_metric(
+        "price",
+        "💰 Продажна цена за 1 бройка / час",
+        min_v=0, max_v=500, step=1,
+    )
+    synced_metric(
+        "cost",
+        "📦 Себестойност на 1 бройка<br><span class='bn-sublabel'>(материали/доставка)</span>",
+        min_v=0, max_v=300, step=1,
+    )
 
     if st.session_state.price <= st.session_state.cost:
         st.error("🛑 Цената трябва да е по-висока от себестойността!")
@@ -275,10 +447,31 @@ with tab1:
         margin = st.session_state.price - st.session_state.cost
         be_units = math.ceil(st.session_state.fixed_costs / margin)
         min_turnover = be_units * st.session_state.price
-        st.markdown("#### **Резултат за твоя бизнес:**")
+        daily_sales = be_units / 30
+
+        st.markdown("#### Резултат за твоя бизнес:")
         col1, col2 = st.columns(2)
-        with col1: st.metric(label="Нужни продажби", value=f"{be_units} бр./мес.")
-        with col2: st.metric(label="Минимум оборот", value=f"{min_turnover} евро")
+        with col1:
+            with st.container(border=True, key="stat_sales"):
+                st.markdown(
+                    f'<div class="bn-stat-label">Нужни продажби</div>'
+                    f'<div class="bn-stat-value">{be_units}</div>'
+                    f'<div class="bn-stat-unit">бр./мес.</div>',
+                    unsafe_allow_html=True,
+                )
+        with col2:
+            with st.container(border=True, key="stat_turnover"):
+                st.markdown(
+                    f'<div class="bn-stat-label">Минимум оборот</div>'
+                    f'<div class="bn-stat-value">{min_turnover}</div>'
+                    f'<div class="bn-stat-unit">евро</div>',
+                    unsafe_allow_html=True,
+                )
+
+        with st.container(border=True, key="tip_box"):
+            st.markdown(
+                f"💡 Това означава средно по **{daily_sales:.1f}** продажби на ден, за да излезеш на нула."
+            )
 
 # TAB 2: AI Validation
 with tab2:
