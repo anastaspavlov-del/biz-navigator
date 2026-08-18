@@ -169,10 +169,36 @@ st.markdown(
 
 # API Keys Check от Secrets
 api_key = st.secrets.get("OPENAI_API_KEY", "")
-stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
 # 📥 УЛАВЯНЕ НА ДАННИТЕ ОТ URL
 session_id = st.query_params.get("session_id")
+
+# 🧪 ТЕСТОВ РЕЖИМ, ВИДИМ САМО ЗА СОБСТВЕНИКА (за донастройки на живо, без риск
+# обикновени посетители да ползват тестова карта вместо реално плащане).
+#
+# - Преди плащане: тестовият линк се показва само ако в URL-а има таен параметър
+#   ?owner_test=<OWNER_TEST_TOKEN>, известен само на теб. Обикновените посетители
+#   никога не виждат и не могат да отворят тестовия линк.
+# - След плащане: ?owner_test не преживява Stripe redirect-а (Stripe връща само
+#   session_id), затова режимът се определя directly от префикса на самото
+#   session_id - Stripe маркира тестовите сесии с "cs_test_", реалните с "cs_live_".
+#   Това работи независимо дали тайният параметър е останал в адреса.
+STRIPE_API_KEY_LIVE = st.secrets.get("STRIPE_API_KEY_LIVE", st.secrets.get("STRIPE_API_KEY", ""))
+STRIPE_API_KEY_TEST = st.secrets.get("STRIPE_API_KEY_TEST", "")
+STRIPE_LINK_LIVE = st.secrets.get("STRIPE_LINK_LIVE", "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00")
+STRIPE_LINK_TEST = st.secrets.get("STRIPE_LINK_TEST", "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00")
+OWNER_TEST_TOKEN = st.secrets.get("test5563", "")
+
+if session_id:
+    use_test_mode = session_id.startswith("cs_test_")
+else:
+    use_test_mode = bool(OWNER_TEST_TOKEN) and st.query_params.get("owner_test") == OWNER_TEST_TOKEN
+
+stripe.api_key = STRIPE_API_KEY_TEST if use_test_mode else STRIPE_API_KEY_LIVE
+STRIPE_LINK = STRIPE_LINK_TEST if use_test_mode else STRIPE_LINK_LIVE
+
+if use_test_mode:
+    st.sidebar.warning("🧪 Тестов режим е активен (видим само за теб чрез тайния параметър).")
 
 # Базови стойности по подразбиране в session_state
 if "fixed_costs" not in st.session_state: st.session_state.fixed_costs = 1200
@@ -558,8 +584,10 @@ with tab2:
                             f"използваме първите {len(embedded['idea'])} символа от идеята ти."
                         )
 
-                    stripe_link = "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00"
-                    dynamic_url = f"{stripe_link}?client_reference_id={client_ref}"
+                    dynamic_url = f"{STRIPE_LINK}?client_reference_id={client_ref}"
+
+                    if use_test_mode:
+                        st.caption("🧪 Тестов режим — картата 4242 4242 4242 4242 не таксува нищо реално.")
 
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
                     st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
