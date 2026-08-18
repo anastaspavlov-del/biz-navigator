@@ -1,8 +1,6 @@
 import streamlit as st
 import math
-import json
 import re
-import base64
 from openai import OpenAI
 import stripe
 from docx import Document
@@ -162,6 +160,17 @@ st.markdown(
         font-weight: 700 !important;
         padding: 0.8rem 1rem !important;
     }
+
+    /* --- Бутон за изтегляне на доклада: отделен, забележим червен цвят --- */
+    [data-testid="stDownloadButton"] button {
+        background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        padding: 0.8rem 1rem !important;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -185,9 +194,8 @@ session_id = st.query_params.get("session_id")
 #   Това работи независимо дали тайният параметър е останал в адреса.
 STRIPE_API_KEY_LIVE = st.secrets.get("STRIPE_API_KEY_LIVE", st.secrets.get("STRIPE_API_KEY", ""))
 STRIPE_API_KEY_TEST = st.secrets.get("STRIPE_API_KEY_TEST", "")
-STRIPE_LINK_LIVE = st.secrets.get("STRIPE_LINK_LIVE", "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00")
-STRIPE_LINK_TEST = st.secrets.get("STRIPE_LINK_TEST", "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00")
 OWNER_TEST_TOKEN = st.secrets.get("OWNER_TEST_TOKEN", "")
+APP_URL = st.secrets.get("APP_URL", "https://biz-navigator.streamlit.app")
 
 if session_id:
     use_test_mode = session_id.startswith("cs_test_")
@@ -195,7 +203,6 @@ else:
     use_test_mode = bool(OWNER_TEST_TOKEN) and st.query_params.get("owner_test") == OWNER_TEST_TOKEN
 
 stripe.api_key = STRIPE_API_KEY_TEST if use_test_mode else STRIPE_API_KEY_LIVE
-STRIPE_LINK = STRIPE_LINK_TEST if use_test_mode else STRIPE_LINK_LIVE
 
 if use_test_mode:
     st.sidebar.warning("🧪 Тестов режим е активен (видим само за теб чрез тайния параметър).")
@@ -208,42 +215,48 @@ if "idea_text" not in st.session_state: st.session_state.idea_text = ""
 if "verified_sessions" not in st.session_state: st.session_state.verified_sessions = {}
 if "generated_reports" not in st.session_state: st.session_state.generated_reports = {}
 
-CLIENT_REF_MAX_LEN = 200  # твърд лимит на Stripe за client_reference_id
+# 💾 ПОСТОЯННО СЪХРАНЕНИЕ НА ИДЕЯТА + ФИНАНСИТЕ ЧРЕЗ STRIPE METADATA
+#
+# По-рано идеята пътуваше кодирана в client_reference_id (лимит ~200 знака,
+# само alphanumeric/-/_) - оттам идваше нуждата от съкращаване. Stripe
+# metadata на Checkout Session позволява до 50 полета по 500 знака всяко,
+# с произволни символи (включително кирилица), затова разбиваме дългата идея
+# на "чънкове" от по IDEA_CHUNK_SIZE знака в отделни metadata полета -
+# практически премахва ограничението (до MAX_IDEA_CHUNKS * IDEA_CHUNK_SIZE
+# знака общо). Данните се записват директно в Stripe при създаването на
+# Checkout Session (виж по-долу) и се препрочитат надеждно след плащането -
+# без нужда от отделна база данни.
+IDEA_CHUNK_SIZE = 480
+MAX_IDEA_CHUNKS = 20  # 20 * 480 = 9600 знака таван, далеч над всякаква реална идея
 
-def encode_client_ref(fixed_costs, price, cost, idea, max_len=CLIENT_REF_MAX_LEN):
-    def build(idea_text):
-        payload = json.dumps(
-            {"c": fixed_costs, "p": price, "s": cost, "i": idea_text},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii").rstrip("=")
-
-    encoded = build(idea)
-    idea_bytes = idea.encode("utf-8")
-    while len(encoded) > max_len and idea_bytes:
-        idea_bytes = idea_bytes[:-1]
-        idea = idea_bytes.decode("utf-8", errors="ignore")
-        idea_bytes = idea.encode("utf-8")
-        encoded = build(idea)
-    return encoded
+def build_report_metadata(fixed_costs, price, cost, idea):
+    idea = idea[: IDEA_CHUNK_SIZE * MAX_IDEA_CHUNKS]
+    chunks = [idea[i:i + IDEA_CHUNK_SIZE] for i in range(0, len(idea), IDEA_CHUNK_SIZE)] or [""]
+    metadata = {
+        "fc": str(fixed_costs),
+        "price": str(price),
+        "cost": str(cost),
+        "idea_chunks": str(len(chunks)),
+    }
+    for i, chunk in enumerate(chunks):
+        metadata[f"idea_{i}"] = chunk
+    return metadata
 
 
-def decode_client_ref(ref):
-    if not ref:
+def read_report_metadata(metadata):
+    if not metadata:
         return None
     try:
-        padded = ref + "=" * (-len(ref) % 4)
-        raw = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8")
-        data = json.loads(raw)
+        n_chunks = int(metadata.get("idea_chunks", "0") or "0")
+        idea = "".join(metadata.get(f"idea_{i}", "") for i in range(n_chunks))
         return {
-            "fixed_costs": int(data["c"]),
-            "price": int(data["p"]),
-            "cost": int(data["s"]),
-            "idea": str(data.get("i", "")),
+            "fixed_costs": int(metadata.get("fc", 0)),
+            "price": int(metadata.get("price", 0)),
+            "cost": int(metadata.get("cost", 0)),
+            "idea": idea,
         }
     except Exception as e:
-        print(f"[client_reference_id] Неуспешно декодиране '{ref}': {e}")
+        print(f"[Stripe metadata] Неуспешно прочитане: {e}")
         return None
 
 
@@ -273,7 +286,7 @@ if session_id:
         st.sidebar.warning("⚠️ Неуспешна проверка на плащането. Презаредете страницата или се свържете с поддръжка.")
 
 if is_payment_valid and st.session_state.get("applied_payment_session") != session_id:
-    decoded = decode_client_ref(stripe_session.client_reference_id if stripe_session else None)
+    decoded = read_report_metadata(stripe_session.metadata if stripe_session else None)
     if decoded:
         st.session_state.fixed_costs = decoded["fixed_costs"]
         st.session_state.price = decoded["price"]
@@ -390,7 +403,10 @@ if is_payment_valid:
                     бизнес доклад на български език. Никакви общи приказки, никакви клишета като
                     "усърдна работа" или "вярвай в себе си" — само конкретни, приложими съвети,
                     основани на числата и идеята на потребителя. Пиши все едно клиентът е платил
-                    500 евро за консултация с реален експерт, не за автоматичен текст.
+                    500 евро за консултация с реален експерт, не за автоматичен текст. Не се
+                    ограничавай в дължината - целта е максимална дълбочина и полезност, не краткост.
+                    Всяка точка по-долу трябва да съдържа конкретни разсъждения и примери, не само
+                    едно изречение - обясни ЗАЩО, не само КАКВО.
 
                     КОНКРЕТНА ИДЕЯ НА ПОТРЕБИТЕЛЯ: "{current_idea}"
 
@@ -408,40 +424,53 @@ if is_payment_valid:
                     числата по-горе:
 
                     ### 📊 ЧАСТ 1: ОБОБЩЕНИЕ ЗА РЪКОВОДСТВОТО (EXECUTIVE SUMMARY)
-                    - 3-4 изречения, обобщаващи реалистичната перспектива пред този конкретен бизнес:
-                      колко трудно/лесно е да се стигне до break-even с тези числа, и какъв е
-                      най-големият шанс за успех.
+                    - 4-5 изречения, обобщаващи реалистичната перспектива пред този конкретен бизнес:
+                      колко трудно/лесно е да се стигне до break-even с тези числа, какъв е
+                      най-големият шанс за успех, и какъв е най-големият риск, ако не се действа
+                      целенасочено.
 
                     ### 💪 ЧАСТ 2: ПЕРСОНАЛИЗИРАН АНАЛИЗ НА МОДЕЛА
                     - СИЛНИ СТРАНИ: 3-те най-големи стратегически предимства на този конкретен модел,
-                      всяко обяснено в 2-3 изречения защо точно за тази идея и тези числа е предимство.
+                      всяко обяснено в 3-4 изречения защо точно за тази идея и тези числа е предимство,
+                      с конкретен пример как да се използва на практика.
                     - СКРИТИ РИСКОВЕ: 3-те най-големи опасности специално за този бизнес на българския
                       пазар (данъци и осигуровки, скрита/наситена конкуренция, регулации, сезонност,
-                      кешфлоу), с КОНКРЕТЕН начин за избягване на всеки риск, не просто описание.
+                      кешфлоу), с КОНКРЕТЕН, изпълним начин за избягване на всеки риск - не просто
+                      описание на проблема.
 
-                    ### 💰 ЧАСТ 3: ФИНАНСОВА СТРАТЕГИЯ И ЦЕНООБРАЗУВАНЕ
-                    - Кратка интерпретация какво точно означава маржът от {margin} евро на бройка/час
-                      за устойчивостта на бизнеса.
+                    ### 🎯 ЧАСТ 3: ЦЕЛЕВА АУДИТОРИЯ И КОНКУРЕНТЕН ПЕЙЗАЖ
+                    - Профил на идеалния клиент за тази идея (демография, поведение, къде се намира).
+                      Защо точно той/тя ще плати за това.
+                    - 2-3 вероятни конкурента (по тип, не измислени имена) на българския пазар и
+                      конкретно с какво тази идея може да се разграничи и да победи на всеки от тях.
+
+                    ### 💰 ЧАСТ 4: ФИНАНСОВА СТРАТЕГИЯ И ЦЕНООБРАЗУВАНЕ
+                    - Подробна интерпретация какво точно означава маржът от {margin} евро на бройка/час
+                      за устойчивостта на бизнеса и за колко бързо се натрупва буфер за неочаквани разходи.
                     - Конкретна препоръка: трябва ли цената/себестойността да се коригират, и с колко,
-                      за да бъде break-even точката реалистично достижима.
-                    - Три сценария за първите 3 месеца (консервативен, реалистичен, оптимистичен) —
-                      за всеки: очакван брой продажби на месец и прогнозна печалба/загуба в евро.
+                      за да бъде break-even точката реалистично достижима по-бързо.
+                    - Три сценария за първите 6 месеца (консервативен, реалистичен, оптимистичен) —
+                      за всеки: очакван брой продажби на месец, прогнозна печалба/загуба в евро,
+                      и в кой месец се очаква реален кумулативен break-even.
 
-                    ### 🗺️ ЧАСТ 4: ПЪТНА КАРТА ПО СТЪПКИ (ROADMAP)
+                    ### 🗺️ ЧАСТ 5: ПЪТНА КАРТА ПО СТЪПКИ (ROADMAP)
                     - Детайлна хронологична пътна карта, специфична за тази идея, разбита по:
-                      Седмица 1, Седмица 2, Седмица 3-4, Месец 2, Месец 3 — какво точно се прави
-                      всяка от тези фази и защо е точно в тази последователност.
+                      Седмица 1, Седмица 2, Седмица 3-4, Месец 2, Месец 3, Месец 4-6 — какво точно
+                      се прави във всяка от тези фази, защо е точно в тази последователност, и какъв
+                      измерим резултат трябва да има на края на всяка фаза.
 
-                    ### 📣 ЧАСТ 5: МАРКЕТИНГ И ПРИДОБИВАНЕ НА ПЪРВИ КЛИЕНТИ
+                    ### 📣 ЧАСТ 6: МАРКЕТИНГ И ПРИДОБИВАНЕ НА ПЪРВИ КЛИЕНТИ
                     - 3 конкретни, нискобюджетни маркетингови канала/тактики, подходящи специално
-                      за тази идея и българския пазар, с приблизителен бюджет и очакван резултат за всеки.
+                      за тази идея и българския пазар, с приблизителен бюджет, очакван резултат и
+                      конкретна първа стъпка за стартиране на всеки канал.
 
-                    ### 📝 ЧАСТ 6: AI ЧЕК-ЛИСТ СЪС ЗАДАЧИ ЗА ТАЗИ СЕДМИЦА
+                    ### 📝 ЧАСТ 7: AI ЧЕК-ЛИСТ СЪС ЗАДАЧИ ЗА ТАЗИ СЕДМИЦА
                     - Списък от точно 5 конкретни, практически задачи, специфични за този бизнес,
-                      подредени по приоритет, които потребителят може да изпълни веднага.
+                      подредени по приоритет, които потребителят може да изпълни веднага, всяка с
+                      кратко обяснение защо е важна точно сега.
 
                     ### 🎯 ЗАКЛЮЧЕНИЕ
-                    - 2-3 изречения с честна, но мотивираща обобщена оценка, и ЕДНО единствено
+                    - 3-4 изречения с честна, но мотивираща обобщена оценка, и ЕДНО единствено
                       най-важно следващо действие, което потребителят трябва да направи утре.
 
                     Форматирай с ясни markdown заглавия и bullet points където е подходящо.
@@ -452,7 +481,8 @@ if is_payment_valid:
                     response = client.chat.completions.create(
                         model="gpt-4o",
                         messages=[{"role": "user", "content": paid_prompt}],
-                        temperature=0.7
+                        temperature=0.7,
+                        max_tokens=4096,
                     )
 
                     full_report = response.choices[0].message.content
@@ -546,11 +576,11 @@ with tab1:
 with tab2:
     st.subheader("🤖 Запиши идеята си")
     text_idea = st.text_area(
-        "Напиши или коригирай идеята си тук (кратко описание в едно-две изречения):",
+        "Напиши или коригирай идеята си тук:",
         placeholder="Пример: Искам да отворя автомивка с 4 бокса в центъра на София...",
         key="idea_text",
-        max_chars=200,
-        help="Дръж описанието кратко - ако е твърде дълго, при плащането ще видиш бележка, че за пълния доклад се ползва само началото на текста.",
+        max_chars=3000,
+        help="Можеш да пишеш свободно и по-подробно - идеята се пази изцяло (без ограничение на практика) и се използва цялата за персонализирания доклад.",
     )
 
     if st.button("🚀 Анализирай моята идея", use_container_width=True):
@@ -571,26 +601,39 @@ with tab2:
 
                     st.markdown("### 📊 Отключи Пълния Експертен Доклад")
 
-                    client_ref = encode_client_ref(
-                        st.session_state.fixed_costs,
-                        st.session_state.price,
-                        st.session_state.cost,
-                        text_idea,
-                    )
-                    embedded = decode_client_ref(client_ref)
-                    if embedded and len(embedded["idea"]) < len(text_idea):
-                        st.caption(
-                            f"ℹ️ Заради ограничение на платежната система, в пълния доклад ще "
-                            f"използваме първите {len(embedded['idea'])} символа от идеята ти."
+                    checkout_url = None
+                    try:
+                        metadata = build_report_metadata(
+                            st.session_state.fixed_costs,
+                            st.session_state.price,
+                            st.session_state.cost,
+                            text_idea,
                         )
+                        checkout_session = stripe.checkout.Session.create(
+                            mode="payment",
+                            line_items=[{
+                                "price_data": {
+                                    "currency": "eur",
+                                    "product_data": {"name": "Бизнес Навигатор — Пълен Експертен Доклад"},
+                                    "unit_amount": 499,
+                                },
+                                "quantity": 1,
+                            }],
+                            metadata=metadata,
+                            success_url=f"{APP_URL}/?session_id={{CHECKOUT_SESSION_ID}}",
+                            cancel_url=APP_URL,
+                        )
+                        checkout_url = checkout_session.url
+                    except Exception as e:
+                        print(f"[Stripe] Грешка при създаване на checkout сесия: {e}")
+                        st.error("⚠️ Възникна проблем при подготовката на плащането. Моля, опитайте отново.")
 
-                    dynamic_url = f"{STRIPE_LINK}?client_reference_id={client_ref}"
+                    if checkout_url:
+                        if use_test_mode:
+                            st.caption("🧪 Тестов режим — картата 4242 4242 4242 4242 не таксува нищо реално.")
 
-                    if use_test_mode:
-                        st.caption("🧪 Тестов режим — картата 4242 4242 4242 4242 не таксува нищо реално.")
-
-                    st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
-                    st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
+                        st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
+                        st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", checkout_url, use_container_width=True)
                 except Exception as e:
                     print(f"[OpenAI] Грешка при безплатен анализ: {e}")
                     st.error("⚠️ Възникна временен проблем. Моля, опитайте отново.")
