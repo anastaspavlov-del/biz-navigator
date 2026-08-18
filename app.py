@@ -187,7 +187,7 @@ STRIPE_API_KEY_LIVE = st.secrets.get("STRIPE_API_KEY_LIVE", st.secrets.get("STRI
 STRIPE_API_KEY_TEST = st.secrets.get("STRIPE_API_KEY_TEST", "")
 STRIPE_LINK_LIVE = st.secrets.get("STRIPE_LINK_LIVE", "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00")
 STRIPE_LINK_TEST = st.secrets.get("STRIPE_LINK_TEST", "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00")
-OWNER_TEST_TOKEN = st.secrets.get("test5563", "")
+OWNER_TEST_TOKEN = st.secrets.get("OWNER_TEST_TOKEN", "")
 
 if session_id:
     use_test_mode = session_id.startswith("cs_test_")
