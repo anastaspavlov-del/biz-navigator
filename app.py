@@ -171,6 +171,15 @@ st.markdown(
 api_key = st.secrets.get("OPENAI_API_KEY", "")
 stripe.api_key = st.secrets.get("STRIPE_API_KEY", "")
 
+# 🧪 Автоматично разпознаване на тестов/реален Stripe режим по префикса на ключа.
+# Така при локално тестване (sk_test_... в secrets) приложението сам минава на
+# тестовия Payment Link, а в продукция (sk_live_... / sk_...) - на реалния,
+# без да се налага ръчна размяна на линка при всеки deploy.
+IS_STRIPE_TEST_MODE = stripe.api_key.startswith("sk_test_")
+STRIPE_LINK_LIVE = st.secrets.get("STRIPE_LINK_LIVE", "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00")
+STRIPE_LINK_TEST = st.secrets.get("STRIPE_LINK_TEST", "https://buy.stripe.com/test_6oU4gBdtE0D17sV8q4cjS00")
+STRIPE_LINK = STRIPE_LINK_TEST if IS_STRIPE_TEST_MODE else STRIPE_LINK_LIVE
+
 # 📥 УЛАВЯНЕ НА ДАННИТЕ ОТ URL
 session_id = st.query_params.get("session_id")
 
@@ -558,8 +567,10 @@ with tab2:
                             f"използваме първите {len(embedded['idea'])} символа от идеята ти."
                         )
 
-                    stripe_link = "https://buy.stripe.com/6oU4gBdtE0D17sV8q4cjS00"
-                    dynamic_url = f"{stripe_link}?client_reference_id={client_ref}"
+                    dynamic_url = f"{STRIPE_LINK}?client_reference_id={client_ref}"
+
+                    if IS_STRIPE_TEST_MODE:
+                        st.caption("🧪 Тестов режим на плащанията — картата 4242 4242 4242 4242 не таксува нищо реално.")
 
                     st.write("Нашият AI ще състави подробна пътна карта и чек-лист специално за тези стойности.")
                     st.link_button("💳 Отключи Пълния Бизнес Доклад за 4.99 евро", dynamic_url, use_container_width=True)
