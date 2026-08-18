@@ -244,15 +244,21 @@ def build_report_metadata(fixed_costs, price, cost, idea):
 
 
 def read_report_metadata(metadata):
-    if not metadata:
+    if metadata is None:
         return None
     try:
-        n_chunks = int(metadata.get("idea_chunks", "0") or "0")
-        idea = "".join(metadata.get(f"idea_{i}", "") for i in range(n_chunks))
+        # В по-новите версии на stripe-python "metadata" е StripeObject, който
+        # вече НЕ поддържа .get(...) като обикновен dict (хвърля AttributeError) -
+        # затова първо го конвертираме в чист Python dict.
+        data = metadata.to_dict() if hasattr(metadata, "to_dict") else dict(metadata)
+        if not data:
+            return None
+        n_chunks = int(data.get("idea_chunks", "0") or "0")
+        idea = "".join(data.get(f"idea_{i}", "") for i in range(n_chunks))
         return {
-            "fixed_costs": int(metadata.get("fc", 0)),
-            "price": int(metadata.get("price", 0)),
-            "cost": int(metadata.get("cost", 0)),
+            "fixed_costs": int(data.get("fc", 0)),
+            "price": int(data.get("price", 0)),
+            "cost": int(data.get("cost", 0)),
             "idea": idea,
         }
     except Exception as e:
